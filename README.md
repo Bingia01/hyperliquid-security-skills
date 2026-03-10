@@ -1,10 +1,12 @@
-# Hyperliquid Security Heuristics for Claude Code
+# Hyperliquid Security for Claude Code
 
 Open-source research framework for classifying, reconstructing, and analyzing Hyperliquid-class incidents across core protocol surfaces, market-structure abuse, user/account compromise, and HyperEVM ecosystem applications.
 
 ## What this is
 
 A structured knowledge base and Claude Code skill pack for reasoning about Hyperliquid security incidents. You give it an incident (a hack, an exploit, a suspicious event). It helps you classify it, reconstruct what happened step by step, extract the reusable mechanics, identify which safety properties broke, and draft detection rules.
+
+If you're building on HyperEVM and want a pre-ship security check, it walks through each vulnerability class from the HyperEVM taxonomy and checks your code for matching patterns, producing findings with line numbers and fix recommendations.
 
 The core pipeline:
 
