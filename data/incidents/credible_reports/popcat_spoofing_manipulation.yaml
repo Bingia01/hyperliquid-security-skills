@@ -1,0 +1,38 @@
+incident_id: hl-2025-11-popcat
+incident_name: POPCAT spoofing and liquidity manipulation against HLP
+date_start: '2025-11-12'
+date_end: '2025-11-13'
+affected_surface: thin market order book, HLP, liquidation path
+scope_bucket: B
+loss_estimate_low: 4900000
+loss_estimate_high: 5000000
+direct_cause: multi-wallet leveraged longs plus fake buy wall and cancellation triggered
+  crash and bad debt absorption
+root_cause: thin-liquidity market could be pushed with modest capital; HLP inherited
+  losses after cascade
+attack_type: spoofing / manipulation / toxic transfer
+prerequisite_conditions:
+- thin market
+- ability to shard capital across wallets
+- outsized notional relative to depth
+attacker_capital_requirements: ~$3M initial capital reported
+attacker_permissions_required: normal user permissions
+asset_or_market_targeted: POPCAT / HLP
+sequence_of_actions:
+- fund multiple wallets
+- open large leveraged longs
+- place massive visible buy wall
+- pull buy wall
+- induce crash
+- force liquidations into HLP
+protocol_response: temporary maintenance / pause reported; event widely described
+  as not a core protocol exploit
+governance_or_human_intervention: true
+recoverability: loss realized by HLP
+incident_nature: economic exploit
+confidence_score: 0.85
+sources:
+- CoinDesk 2025-11-13
+- Yahoo Finance 2025-11-13
+status: credible_report
+confidence: medium

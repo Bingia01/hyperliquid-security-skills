@@ -1,0 +1,41 @@
+incident_id: hl-2025-03-jelly
+incident_name: JELLY self-liquidation / short squeeze against HLP
+date_start: '2025-03-26'
+date_end: '2025-03-26'
+affected_surface: thin market pricing, liquidation engine, HLP, governance response
+scope_bucket: B
+loss_estimate_low: 12000000
+loss_estimate_high: 13500000
+direct_cause: coordinated opposing positions plus external spot buying pushed HLP
+  into inherited toxic short exposure
+root_cause: illiquid market structure, unsafe toxic-position inheritance, and crisis-path
+  governance discretion
+attack_type: market manipulation / self-liquidation / toxic transfer
+prerequisite_conditions:
+- thin or manipulable market
+- ability to control both sides via multiple accounts
+- HLP inherits liquidation exposure
+- manual crisis path exists
+attacker_capital_requirements: millions
+attacker_permissions_required: normal user permissions
+asset_or_market_targeted: JELLY perp / HLP
+sequence_of_actions:
+- fund multiple accounts
+- open coordinated opposing positions
+- force liquidation of short leg
+- transfer short to HLP
+- pump spot price externally
+- inflate HLP unrealized loss
+- trigger emergency delisting / settlement
+protocol_response: validator set delisted JELLY perps and settled affected users with
+  foundation backstop excluding flagged addresses
+governance_or_human_intervention: true
+recoverability: loss path interrupted by manual intervention
+incident_nature: economic exploit
+confidence_score: 0.95
+sources:
+- Arkham 2025-03-26
+- CoinDesk 2025-03-26
+- Hyperliquid statement
+status: confirmed
+confidence: high

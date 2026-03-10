@@ -1,0 +1,35 @@
+incident_id: hl-2024-12-lazarus-recon
+incident_name: Lazarus-linked reconnaissance / suspicious activity
+date_start: '2024-12-23'
+date_end: '2024-12-24'
+affected_surface: user flows, opsec, validator / infra concern, reputation stress
+scope_bucket: A
+loss_estimate_low: 0
+loss_estimate_high: 0
+direct_cause: suspicious activity from wallets linked by researchers to DPRK / Lazarus
+  raised concern that the venue was being probed
+root_cause: unconfirmed; best treated as reconnaissance / stress event rather than
+  confirmed exploit
+attack_type: reconnaissance / probing
+prerequisite_conditions:
+- attacker has access to linked wallets and trading flow
+- venue can be tested via public trading and deposit / withdrawal surfaces
+attacker_capital_requirements: low-to-moderate
+attacker_permissions_required: standard user access
+asset_or_market_targeted: Hyperliquid user and infra surfaces broadly
+sequence_of_actions:
+- deposit via linked wallets
+- trade / probe venue behavior
+- withdraw
+- trigger public concern over potential deeper exploit preparation
+protocol_response: Hyperliquid publicly denied any exploit and said all user funds
+  were accounted for
+governance_or_human_intervention: false
+recoverability: n/a; no confirmed loss event
+incident_nature: reconnaissance / near-miss
+confidence_score: 0.65
+sources:
+- Hyperliquid public denial on 2024-12-23
+- secondary reporting on Lazarus-linked wallet activity
+status: research_lead
+confidence: research_lead

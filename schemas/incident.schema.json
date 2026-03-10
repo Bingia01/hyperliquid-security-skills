@@ -1,0 +1,138 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Hyperliquid Incident Record",
+  "type": "object",
+  "required": [
+    "incident_id",
+    "incident_name",
+    "date_start",
+    "affected_surface",
+    "scope_bucket",
+    "attack_type",
+    "incident_nature",
+    "status",
+    "confidence",
+    "sources"
+  ],
+  "properties": {
+    "incident_id": {
+      "type": "string"
+    },
+    "incident_name": {
+      "type": "string"
+    },
+    "date_start": {
+      "type": "string"
+    },
+    "date_end": {
+      "type": "string"
+    },
+    "affected_surface": {
+      "type": "string"
+    },
+    "scope_bucket": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "confirmed",
+        "credible_report",
+        "research_lead"
+      ]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "research_lead"
+      ]
+    },
+    "loss_estimate_low": {
+      "type": [
+        "number",
+        "integer",
+        "null"
+      ]
+    },
+    "loss_estimate_high": {
+      "type": [
+        "number",
+        "integer",
+        "null"
+      ]
+    },
+    "direct_cause": {
+      "type": "string"
+    },
+    "root_cause": {
+      "type": "string"
+    },
+    "attack_type": {
+      "type": "string"
+    },
+    "prerequisite_conditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "attacker_capital_requirements": {
+      "type": "string"
+    },
+    "attacker_permissions_required": {
+      "type": "string"
+    },
+    "asset_or_market_targeted": {
+      "type": "string"
+    },
+    "sequence_of_actions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "protocol_response": {
+      "type": "string"
+    },
+    "governance_or_human_intervention": {
+      "type": "boolean"
+    },
+    "recoverability": {
+      "type": "string"
+    },
+    "incident_nature": {
+      "type": "string",
+      "enum": [
+        "code bug",
+        "economic exploit",
+        "operational failure",
+        "key compromise",
+        "rug pull",
+        "mixed"
+      ]
+    },
+    "confidence_score": {
+      "type": [
+        "number",
+        "integer"
+      ]
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

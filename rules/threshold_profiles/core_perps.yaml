@@ -1,0 +1,14 @@
+profile: core_perps
+description: Defaults for Hyperliquid core perpetual markets with relatively deeper
+  books and stronger anchors.
+thresholds:
+  oi_to_visible_depth_warn: 8.0
+  oi_to_visible_depth_crit: 12.0
+  liquidation_notional_to_depth_warn: 1.5
+  liquidation_notional_to_depth_crit: 2.5
+  venue_anchor_divergence_bps_warn: 150
+  venue_anchor_divergence_bps_crit: 300
+  single_account_position_to_marketcap_warn: 0.08
+  single_account_position_to_marketcap_crit: 0.15
+  hlp_loss_velocity_pct_hour_warn: 1.0
+  hlp_loss_velocity_pct_hour_crit: 2.5

@@ -1,0 +1,33 @@
+incident_id: hl-2025-10-key-compromise
+incident_name: Large Hyperliquid wallet private-key compromise
+date_start: '2025-10-10'
+date_end: '2025-10-10'
+affected_surface: user account security / bridge-out behavior
+scope_bucket: C
+loss_estimate_low: 20600000
+loss_estimate_high: 21000000
+direct_cause: private key leak enabled draining of wallet assets
+root_cause: user or operator key management failure, not established as core protocol
+  bug
+attack_type: private key compromise
+prerequisite_conditions:
+- attacker obtains private key or equivalent signing control
+attacker_capital_requirements: minimal
+attacker_permissions_required: stolen signing authority
+asset_or_market_targeted: DAI and other tokens in user wallet
+sequence_of_actions:
+- obtain key
+- sign draining transfers
+- bridge assets out
+- launder / disperse funds
+protocol_response: user-side compromise pattern; Hyperliquid support docs instruct
+  users to burn compromised addresses and move assets
+governance_or_human_intervention: false
+recoverability: typically poor absent freezing or recovery path
+incident_nature: key compromise
+confidence_score: 0.8
+sources:
+- Yahoo Finance 2025-10-10
+- Hyperliquid support docs on compromised accounts
+status: credible_report
+confidence: medium

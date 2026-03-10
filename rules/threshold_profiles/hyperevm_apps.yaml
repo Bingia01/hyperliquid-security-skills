@@ -1,0 +1,9 @@
+profile: hyperevm_apps
+description: Application-layer thresholds centered on permissioning and arbitrary
+  external call exposure.
+thresholds:
+  arbitrary_call_allowed: critical
+  operator_scope_exceeds_function: high
+  missing_post_call_invariant_checks: high
+  unbounded_router_target_set: critical
+  admin_key_single_sig: medium

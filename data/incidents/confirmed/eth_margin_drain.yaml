@@ -1,0 +1,39 @@
+incident_id: hl-2025-03-eth-margin-drain
+incident_name: ETH whale strategic liquidation / margin drain
+date_start: '2025-03-12'
+date_end: '2025-03-12'
+affected_surface: liquidation engine, HLP, margin rules
+scope_bucket: B
+loss_estimate_low: 4000000
+loss_estimate_high: 4000000
+direct_cause: large user withdrew collateral while holding outsized leveraged ETH
+  long, triggering liquidation into HLP
+root_cause: large-position unwind cost exceeded safe liquidation assumptions; margin
+  withdrawal plus vault inheritance created a profitable strategic liquidation path
+attack_type: strategic liquidation / toxic position transfer
+prerequisite_conditions:
+- very large leveraged position
+- ability to withdraw collateral before liquidation
+- HLP backstop absorbs inherited position
+attacker_capital_requirements: millions in margin
+attacker_permissions_required: normal user permissions
+asset_or_market_targeted: ETH perp / HLP
+sequence_of_actions:
+- open oversized leveraged long
+- accrue unrealized pnl
+- withdraw collateral
+- move liquidation threshold closer
+- allow liquidation
+- HLP inherits and unwinds at loss
+protocol_response: Hyperliquid stated there was no protocol exploit and lowered max
+  leverage for BTC and ETH
+governance_or_human_intervention: false
+recoverability: loss realized by HLP; no evidence of core code bug
+incident_nature: economic exploit
+confidence_score: 0.9
+sources:
+- CoinDesk 2025-03-12
+- Arkham 2025-03-12
+- Hyperliquid statement
+status: confirmed
+confidence: high

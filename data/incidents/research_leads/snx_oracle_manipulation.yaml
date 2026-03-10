@@ -1,0 +1,33 @@
+incident_id: hl-2023-06-snx
+incident_name: SNX oracle / pricing manipulation against HLP
+date_start: 2023-06
+date_end: 2023-06
+affected_surface: pricing, HLP, market abuse
+scope_bucket: B
+loss_estimate_low: 37000
+loss_estimate_high: 37000
+direct_cause: price distortion on a referenced venue used to create advantageous trading
+  conditions against HLP
+root_cause: external pricing fragility and insufficient protection against thinly
+  anchored market inputs
+attack_type: oracle / market manipulation
+prerequisite_conditions:
+- thin or influenceable external reference
+- ability to trade against HLP on Hyperliquid
+attacker_capital_requirements: small-to-moderate relative to target market depth
+attacker_permissions_required: none beyond normal trading access
+asset_or_market_targeted: SNX-related market
+sequence_of_actions:
+- move or influence external reference price
+- take advantageous position against Hyperliquid liquidity
+- realize gain as HLP marks against distorted conditions
+protocol_response: historical incident used as precursor pattern for later manipulation
+  analysis
+governance_or_human_intervention: false
+recoverability: loss realized; limited public detail in this pack
+incident_nature: economic exploit
+confidence_score: 0.55
+sources:
+- secondary market reporting and ecosystem references; needs stronger primary confirmation
+status: research_lead
+confidence: research_lead

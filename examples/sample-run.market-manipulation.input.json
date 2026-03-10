@@ -1,0 +1,35 @@
+{
+  "market": {
+    "symbol": "JELLY-PERP",
+    "open_interest_usd": 18200000,
+    "executable_depth_usd_1pct": 1700000,
+    "executable_depth_usd_2pct": 3100000,
+    "top_positions": [
+      {"wallet": "0xA", "notional_usd": 5200000},
+      {"wallet": "0xB", "notional_usd": 4100000}
+    ],
+    "liquidation_notional_usd_5pct_band": 6600000,
+    "price_move_sigma_15m": 5.2,
+    "external_anchor_divergence_bps": 240,
+    "mark_price": 0.51,
+    "oracle_price": 0.47,
+    "external_anchor_price": 0.46,
+    "settlement_reference_price": 0.0095,
+    "settlement_window_minutes": 15,
+    "market_type": "core_perp",
+    "halt_state": false,
+    "delisting_risk_flags": [true, true, false]
+  },
+  "hlp": {
+    "inventory_delta_usd_5m": 4200000,
+    "total_inventory_usd": 8300000,
+    "unwind_velocity_usd_5m": 2400000,
+    "unrealized_pnl_delta_usd_15m": -6900000
+  },
+  "governance": {
+    "manual_override_capability": true
+  },
+  "system": {
+    "circuit_breakers_present": false
+  }
+}

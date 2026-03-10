@@ -1,0 +1,30 @@
+incident_id: hl-2025-09-hypervault
+incident_name: HyperVault suspected exit scam
+date_start: '2025-09-26'
+date_end: '2025-09-26'
+affected_surface: ecosystem app / governance / custody behavior
+scope_bucket: D
+loss_estimate_low: 3600000
+loss_estimate_high: 3600000
+direct_cause: abnormal outflows followed by disappearance of project presence
+root_cause: custodial / governance trust failure, likely not a Hyperliquid core exploit
+attack_type: rug pull / exit scam
+prerequisite_conditions:
+- user funds controlled by project operators
+attacker_capital_requirements: n/a
+attacker_permissions_required: project operator control
+asset_or_market_targeted: HyperVault user funds
+sequence_of_actions:
+- withdraw funds
+- bridge or swap proceeds
+- launder via Tornado Cash
+- delete social presence
+protocol_response: no core protocol fix implied; ecosystem trust event
+governance_or_human_intervention: false
+recoverability: poor
+incident_nature: rug pull
+confidence_score: 0.7
+sources:
+- Nominis monthly report September 2025
+status: research_lead
+confidence: research_lead

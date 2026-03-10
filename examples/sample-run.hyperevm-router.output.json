@@ -1,0 +1,37 @@
+{
+  "run_id": "sample-hyperdrive-style-001",
+  "surface": "HyperEVM app / router permissions",
+  "alerts": [
+    {
+      "alert_key": "arbitrary_call_surface",
+      "severity": "critical",
+      "evidence": {
+        "user_callable_execute": true,
+        "user_supplied_target": true,
+        "user_supplied_calldata": true,
+        "allowlist_scope": "broad",
+        "post_call_invariant_checks": false
+      },
+      "why_it_matters": "An attacker may be able to route execution into unintended external contracts or state transitions."
+    },
+    {
+      "alert_key": "operator_permission_scope_creep",
+      "severity": "high",
+      "evidence": {
+        "role_name": "operator",
+        "extra_actions": [
+          "move_user_funds",
+          "call_whitelisted_contracts"
+        ],
+        "upgradeability": true,
+        "can_move_user_funds": true
+      },
+      "why_it_matters": "The permission model grants more power than the business workflow appears to require."
+    }
+  ],
+  "recommended_next_steps": [
+    "Restrict target and calldata shape with tight allowlists.",
+    "Add post-call accounting invariants and balance delta checks.",
+    "Split operator powers so position management cannot move arbitrary user funds."
+  ]
+}

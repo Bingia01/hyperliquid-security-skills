@@ -1,0 +1,14 @@
+profile: hip3_markets
+description: Stricter defaults for builder-deployed perps where oracle design, settlement,
+  and market ops can vary.
+thresholds:
+  oi_to_visible_depth_warn: 4.0
+  oi_to_visible_depth_crit: 7.0
+  liquidation_notional_to_depth_warn: 1.0
+  liquidation_notional_to_depth_crit: 1.8
+  venue_anchor_divergence_bps_warn: 100
+  venue_anchor_divergence_bps_crit: 200
+  single_account_position_to_marketcap_warn: 0.05
+  single_account_position_to_marketcap_crit: 0.1
+  settlement_discontinuity_bps_warn: 120
+  settlement_discontinuity_bps_crit: 250

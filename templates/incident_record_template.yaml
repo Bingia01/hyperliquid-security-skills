@@ -1,0 +1,25 @@
+incident_id:
+incident_name:
+date_start:
+date_end:
+affected_surface:
+scope_bucket: A | B | C | D
+status: confirmed | credible_report | research_lead
+confidence: high | medium | research_lead
+loss_estimate_low:
+loss_estimate_high:
+direct_cause:
+root_cause:
+attack_type:
+prerequisite_conditions: []
+attacker_capital_requirements:
+attacker_permissions_required:
+asset_or_market_targeted:
+sequence_of_actions: []
+protocol_response:
+governance_or_human_intervention: false
+recoverability:
+incident_nature: code bug | economic exploit | operational failure | key compromise | rug pull | mixed
+confidence_score:
+sources: []
+notes:

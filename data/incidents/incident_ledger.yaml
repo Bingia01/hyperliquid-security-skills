@@ -1,0 +1,286 @@
+- incident_id: hl-2023-06-snx
+  incident_name: SNX oracle / pricing manipulation against HLP
+  date_start: 2023-06
+  date_end: 2023-06
+  affected_surface: pricing, HLP, market abuse
+  scope_bucket: B
+  loss_estimate_low: 37000
+  loss_estimate_high: 37000
+  direct_cause: price distortion on a referenced venue used to create advantageous
+    trading conditions against HLP
+  root_cause: external pricing fragility and insufficient protection against thinly
+    anchored market inputs
+  attack_type: oracle / market manipulation
+  prerequisite_conditions:
+  - thin or influenceable external reference
+  - ability to trade against HLP on Hyperliquid
+  attacker_capital_requirements: small-to-moderate relative to target market depth
+  attacker_permissions_required: none beyond normal trading access
+  asset_or_market_targeted: SNX-related market
+  sequence_of_actions:
+  - move or influence external reference price
+  - take advantageous position against Hyperliquid liquidity
+  - realize gain as HLP marks against distorted conditions
+  protocol_response: historical incident used as precursor pattern for later manipulation
+    analysis
+  governance_or_human_intervention: false
+  recoverability: loss realized; limited public detail in this pack
+  incident_nature: economic exploit
+  confidence_score: 0.55
+  sources:
+  - secondary market reporting and ecosystem references; needs stronger primary confirmation
+  status: research_lead
+  confidence: research_lead
+- incident_id: hl-2025-03-eth-margin-drain
+  incident_name: ETH whale strategic liquidation / margin drain
+  date_start: '2025-03-12'
+  date_end: '2025-03-12'
+  affected_surface: liquidation engine, HLP, margin rules
+  scope_bucket: B
+  loss_estimate_low: 4000000
+  loss_estimate_high: 4000000
+  direct_cause: large user withdrew collateral while holding outsized leveraged ETH
+    long, triggering liquidation into HLP
+  root_cause: large-position unwind cost exceeded safe liquidation assumptions; margin
+    withdrawal plus vault inheritance created a profitable strategic liquidation path
+  attack_type: strategic liquidation / toxic position transfer
+  prerequisite_conditions:
+  - very large leveraged position
+  - ability to withdraw collateral before liquidation
+  - HLP backstop absorbs inherited position
+  attacker_capital_requirements: millions in margin
+  attacker_permissions_required: normal user permissions
+  asset_or_market_targeted: ETH perp / HLP
+  sequence_of_actions:
+  - open oversized leveraged long
+  - accrue unrealized pnl
+  - withdraw collateral
+  - move liquidation threshold closer
+  - allow liquidation
+  - HLP inherits and unwinds at loss
+  protocol_response: Hyperliquid stated there was no protocol exploit and lowered
+    max leverage for BTC and ETH
+  governance_or_human_intervention: false
+  recoverability: loss realized by HLP; no evidence of core code bug
+  incident_nature: economic exploit
+  confidence_score: 0.9
+  sources:
+  - CoinDesk 2025-03-12
+  - Arkham 2025-03-12
+  - Hyperliquid statement
+  status: confirmed
+  confidence: high
+- incident_id: hl-2025-03-jelly
+  incident_name: JELLY self-liquidation / short squeeze against HLP
+  date_start: '2025-03-26'
+  date_end: '2025-03-26'
+  affected_surface: thin market pricing, liquidation engine, HLP, governance response
+  scope_bucket: B
+  loss_estimate_low: 12000000
+  loss_estimate_high: 13500000
+  direct_cause: coordinated opposing positions plus external spot buying pushed HLP
+    into inherited toxic short exposure
+  root_cause: illiquid market structure, unsafe toxic-position inheritance, and crisis-path
+    governance discretion
+  attack_type: market manipulation / self-liquidation / toxic transfer
+  prerequisite_conditions:
+  - thin or manipulable market
+  - ability to control both sides via multiple accounts
+  - HLP inherits liquidation exposure
+  - manual crisis path exists
+  attacker_capital_requirements: millions
+  attacker_permissions_required: normal user permissions
+  asset_or_market_targeted: JELLY perp / HLP
+  sequence_of_actions:
+  - fund multiple accounts
+  - open coordinated opposing positions
+  - force liquidation of short leg
+  - transfer short to HLP
+  - pump spot price externally
+  - inflate HLP unrealized loss
+  - trigger emergency delisting / settlement
+  protocol_response: validator set delisted JELLY perps and settled affected users
+    with foundation backstop excluding flagged addresses
+  governance_or_human_intervention: true
+  recoverability: loss path interrupted by manual intervention
+  incident_nature: economic exploit
+  confidence_score: 0.95
+  sources:
+  - Arkham 2025-03-26
+  - CoinDesk 2025-03-26
+  - Hyperliquid statement
+  status: confirmed
+  confidence: high
+- incident_id: hl-2025-09-hyperdrive
+  incident_name: Hyperdrive router exploit
+  date_start: '2025-09-27'
+  date_end: '2025-09-28'
+  affected_surface: HyperEVM / ecosystem app router permissions
+  scope_bucket: D
+  loss_estimate_low: 773000
+  loss_estimate_high: 782000
+  direct_cause: router path allowed repeated arbitrary or insecure call behavior against
+    user funds / pools
+  root_cause: overbroad operator or router permissions and insufficient invariant
+    checks
+  attack_type: router abuse / arbitrary call / permission boundary failure
+  prerequisite_conditions:
+  - users or pools exposed to router permissions
+  - unsafe router contract logic
+  attacker_capital_requirements: low relative to funds targeted
+  attacker_permissions_required: exploit path through contract design
+  asset_or_market_targeted: USDT0 and thBILL-related Hyperdrive markets
+  sequence_of_actions:
+  - discover unsafe router path
+  - invoke insecure function repeatedly
+  - drain targeted pools/accounts
+  - bridge or swap out stolen funds
+  protocol_response: protocol paused markets, claimed root cause fixed, and prepared
+    compensation
+  governance_or_human_intervention: true
+  recoverability: partial remediation reported; exact recovery unclear in this pack
+  incident_nature: code bug
+  confidence_score: 0.8
+  sources:
+  - CertiK-cited secondary reporting
+  - Yahoo Finance 2025-10-10
+  - Crypto.news follow-up
+  status: confirmed
+  confidence: high
+- incident_id: hl-2025-09-hypervault
+  incident_name: HyperVault suspected exit scam
+  date_start: '2025-09-26'
+  date_end: '2025-09-26'
+  affected_surface: ecosystem app / governance / custody behavior
+  scope_bucket: D
+  loss_estimate_low: 3600000
+  loss_estimate_high: 3600000
+  direct_cause: abnormal outflows followed by disappearance of project presence
+  root_cause: custodial / governance trust failure, likely not a Hyperliquid core
+    exploit
+  attack_type: rug pull / exit scam
+  prerequisite_conditions:
+  - user funds controlled by project operators
+  attacker_capital_requirements: n/a
+  attacker_permissions_required: project operator control
+  asset_or_market_targeted: HyperVault user funds
+  sequence_of_actions:
+  - withdraw funds
+  - bridge or swap proceeds
+  - launder via Tornado Cash
+  - delete social presence
+  protocol_response: no core protocol fix implied; ecosystem trust event
+  governance_or_human_intervention: false
+  recoverability: poor
+  incident_nature: rug pull
+  confidence_score: 0.7
+  sources:
+  - Nominis monthly report September 2025
+  status: research_lead
+  confidence: research_lead
+- incident_id: hl-2025-10-key-compromise
+  incident_name: Large Hyperliquid wallet private-key compromise
+  date_start: '2025-10-10'
+  date_end: '2025-10-10'
+  affected_surface: user account security / bridge-out behavior
+  scope_bucket: C
+  loss_estimate_low: 20600000
+  loss_estimate_high: 21000000
+  direct_cause: private key leak enabled draining of wallet assets
+  root_cause: user or operator key management failure, not established as core protocol
+    bug
+  attack_type: private key compromise
+  prerequisite_conditions:
+  - attacker obtains private key or equivalent signing control
+  attacker_capital_requirements: minimal
+  attacker_permissions_required: stolen signing authority
+  asset_or_market_targeted: DAI and other tokens in user wallet
+  sequence_of_actions:
+  - obtain key
+  - sign draining transfers
+  - bridge assets out
+  - launder / disperse funds
+  protocol_response: user-side compromise pattern; Hyperliquid support docs instruct
+    users to burn compromised addresses and move assets
+  governance_or_human_intervention: false
+  recoverability: typically poor absent freezing or recovery path
+  incident_nature: key compromise
+  confidence_score: 0.8
+  sources:
+  - Yahoo Finance 2025-10-10
+  - Hyperliquid support docs on compromised accounts
+  status: credible_report
+  confidence: medium
+- incident_id: hl-2025-11-popcat
+  incident_name: POPCAT spoofing and liquidity manipulation against HLP
+  date_start: '2025-11-12'
+  date_end: '2025-11-13'
+  affected_surface: thin market order book, HLP, liquidation path
+  scope_bucket: B
+  loss_estimate_low: 4900000
+  loss_estimate_high: 5000000
+  direct_cause: multi-wallet leveraged longs plus fake buy wall and cancellation triggered
+    crash and bad debt absorption
+  root_cause: thin-liquidity market could be pushed with modest capital; HLP inherited
+    losses after cascade
+  attack_type: spoofing / manipulation / toxic transfer
+  prerequisite_conditions:
+  - thin market
+  - ability to shard capital across wallets
+  - outsized notional relative to depth
+  attacker_capital_requirements: ~$3M initial capital reported
+  attacker_permissions_required: normal user permissions
+  asset_or_market_targeted: POPCAT / HLP
+  sequence_of_actions:
+  - fund multiple wallets
+  - open large leveraged longs
+  - place massive visible buy wall
+  - pull buy wall
+  - induce crash
+  - force liquidations into HLP
+  protocol_response: temporary maintenance / pause reported; event widely described
+    as not a core protocol exploit
+  governance_or_human_intervention: true
+  recoverability: loss realized by HLP
+  incident_nature: economic exploit
+  confidence_score: 0.85
+  sources:
+  - CoinDesk 2025-11-13
+  - Yahoo Finance 2025-11-13
+  status: credible_report
+  confidence: medium
+- incident_id: hl-2024-12-lazarus-recon
+  incident_name: Lazarus-linked reconnaissance / suspicious activity
+  date_start: '2024-12-23'
+  date_end: '2024-12-24'
+  affected_surface: user flows, opsec, validator / infra concern, reputation stress
+  scope_bucket: A
+  loss_estimate_low: 0
+  loss_estimate_high: 0
+  direct_cause: suspicious activity from wallets linked by researchers to DPRK / Lazarus
+    raised concern that the venue was being probed
+  root_cause: unconfirmed; best treated as reconnaissance / stress event rather than
+    confirmed exploit
+  attack_type: reconnaissance / probing
+  prerequisite_conditions:
+  - attacker has access to linked wallets and trading flow
+  - venue can be tested via public trading and deposit / withdrawal surfaces
+  attacker_capital_requirements: low-to-moderate
+  attacker_permissions_required: standard user access
+  asset_or_market_targeted: Hyperliquid user and infra surfaces broadly
+  sequence_of_actions:
+  - deposit via linked wallets
+  - trade / probe venue behavior
+  - withdraw
+  - trigger public concern over potential deeper exploit preparation
+  protocol_response: Hyperliquid publicly denied any exploit and said all user funds
+    were accounted for
+  governance_or_human_intervention: false
+  recoverability: n/a; no confirmed loss event
+  incident_nature: reconnaissance / near-miss
+  confidence_score: 0.65
+  sources:
+  - Hyperliquid public denial on 2024-12-23
+  - secondary reporting on Lazarus-linked wallet activity
+  status: research_lead
+  confidence: research_lead

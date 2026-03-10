@@ -1,0 +1,330 @@
+version: 1
+name: hyperliquid-heuristics
+last_updated: 2026-03-09
+notes:
+  - Thresholds are starter defaults for research and simulation, not production guarantees.
+  - Severity should be adjusted by asset class, liquidity regime, and whether the surface is core Hyperliquid, HIP-3, HIP-4, or a HyperEVM app.
+  - Each rule is tagged as observed, adjacent, or theoretical.
+
+heuristics:
+  - id: thin_market_squeeze_risk
+    family: market_manipulation
+    status: observed
+    severity: high
+    applies_to: [core_perps, hlp, hip3_perps, hyperps]
+    description: Detects markets where open interest and liquidation pressure are too large relative to executable liquidity.
+    required_inputs:
+      - market.open_interest_usd
+      - market.executable_depth_usd_1pct
+      - market.executable_depth_usd_2pct
+      - market.top_positions
+      - market.liquidation_notional_usd_5pct_band
+      - market.price_move_sigma_15m
+      - market.external_anchor_divergence_bps
+    thresholds:
+      oi_to_depth_1pct: 8.0
+      largest_position_to_depth_1pct: 2.5
+      liquidation_to_depth_2pct: 1.5
+      price_move_sigma_15m: 4.0
+      external_anchor_divergence_bps: 150
+    logic:
+      all_of:
+        - "market.open_interest_usd / market.executable_depth_usd_1pct >= 8.0"
+        - "max(market.top_positions.notional_usd) / market.executable_depth_usd_1pct >= 2.5"
+        - "market.liquidation_notional_usd_5pct_band / market.executable_depth_usd_2pct >= 1.5"
+      any_of:
+        - "market.price_move_sigma_15m >= 4.0"
+        - "market.external_anchor_divergence_bps >= 150"
+    outputs:
+      alert_key: thin_market_squeeze_risk
+      include:
+        - market symbol
+        - oi_to_depth_ratio
+        - largest_position_to_depth_ratio
+        - liquidation_to_depth_ratio
+        - external_anchor_divergence_bps
+        - likely_protocol_exposure_bucket
+
+  - id: toxic_inventory_transfer
+    family: liquidation_risk_engine
+    status: observed
+    severity: high
+    applies_to: [hlp, liquidations, portfolio_margin, core_perps, hip3_perps]
+    description: Detects when protocol-controlled inventory grows too quickly after liquidations and exceeds reasonable unwind capacity.
+    required_inputs:
+      - hlp.inventory_delta_usd_5m
+      - hlp.total_inventory_usd
+      - market.executable_depth_usd_1pct
+      - market.executable_depth_usd_2pct
+      - hlp.unwind_velocity_usd_5m
+      - hlp.unrealized_pnl_delta_usd_15m
+    thresholds:
+      inventory_delta_to_depth_1pct: 1.0
+      total_inventory_to_depth_2pct: 2.0
+      pnl_delta_usd_15m: -1000000
+    logic:
+      all_of:
+        - "hlp.inventory_delta_usd_5m / market.executable_depth_usd_1pct >= 1.0"
+        - "hlp.total_inventory_usd / market.executable_depth_usd_2pct >= 2.0"
+      any_of:
+        - "hlp.unrealized_pnl_delta_usd_15m <= -1000000"
+        - "hlp.unwind_velocity_usd_5m > market.executable_depth_usd_1pct"
+    outputs:
+      alert_key: toxic_inventory_transfer
+      include:
+        - inherited_inventory_usd
+        - depth_ratios
+        - unwind_velocity
+        - pnl_deterioration
+
+  - id: settlement_cliff
+    family: pricing_settlement
+    status: observed
+    severity: medium
+    applies_to: [core_perps, hip3_perps, hyperps, hip4_markets]
+    description: Detects dangerous widening between mark, oracle/index, and settlement-relevant pricing paths.
+    required_inputs:
+      - market.mark_price
+      - market.oracle_price
+      - market.external_anchor_price
+      - market.settlement_reference_price
+      - market.settlement_window_minutes
+      - market.market_type
+    thresholds:
+      mark_oracle_spread_bps: 100
+      mark_anchor_spread_bps: 150
+      settlement_window_minutes: 30
+    logic:
+      all_of:
+        - "bps(market.mark_price, market.oracle_price) >= 100"
+        - "bps(market.mark_price, market.external_anchor_price) >= 150"
+      any_of:
+        - "market.settlement_window_minutes <= 30"
+        - "market.market_type in ['hyperps','hip3','hip4']"
+    outputs:
+      alert_key: settlement_cliff
+      include:
+        - mark_oracle_bps
+        - mark_anchor_bps
+        - settlement_reference_summary
+        - market_type
+
+  - id: crisis_centralization_trigger
+    family: governance_override
+    status: observed
+    severity: high
+    applies_to: [validators, governance, delisting, emergency_settlement]
+    description: Detects stress conditions that make manual delisting, manual pricing, or validator override likely.
+    required_inputs:
+      - hlp.unrealized_pnl_delta_usd_15m
+      - market.halt_state
+      - market.delisting_risk_flags
+      - system.circuit_breakers_present
+      - governance.manual_override_capability
+    thresholds:
+      pnl_delta_usd_15m: -3000000
+      delisting_flags_min: 2
+    logic:
+      all_of:
+        - "hlp.unrealized_pnl_delta_usd_15m <= -3000000"
+        - "governance.manual_override_capability == true"
+      any_of:
+        - "count_true(market.delisting_risk_flags) >= 2"
+        - "system.circuit_breakers_present == false"
+    outputs:
+      alert_key: crisis_centralization_trigger
+      include:
+        - pnl_deterioration
+        - active_delisting_flags
+        - override_capability
+        - response_path_summary
+
+  - id: strategic_margin_drain
+    family: account_liquidation_behavior
+    status: observed
+    severity: high
+    applies_to: [core_perps, portfolio_margin, unified_accounts]
+    description: Detects users withdrawing collateral instead of closing an outsized position, pushing themselves toward liquidation.
+    required_inputs:
+      - account.collateral_delta_usd_30m
+      - account.position_notional_usd
+      - account.maintenance_margin_ratio_before
+      - account.maintenance_margin_ratio_after
+      - account.liquidation_price_distance_bps_before
+      - account.liquidation_price_distance_bps_after
+    thresholds:
+      collateral_withdrawal_usd: -1000000
+      position_notional_usd: 10000000
+      liquidation_distance_compression_bps: 500
+    logic:
+      all_of:
+        - "account.collateral_delta_usd_30m <= -1000000"
+        - "account.position_notional_usd >= 10000000"
+        - "account.liquidation_price_distance_bps_before - account.liquidation_price_distance_bps_after >= 500"
+    outputs:
+      alert_key: strategic_margin_drain
+      include:
+        - collateral_delta_usd_30m
+        - position_notional_usd
+        - liquidation_distance_before_after
+        - estimated_slippage_vs_liquidation_penalty
+
+  - id: coordinated_multi_wallet
+    family: coordination_behavior
+    status: observed
+    severity: high
+    applies_to: [market_manipulation, user_behavior, bridge_flows]
+    description: Detects clusters of wallets funded together that concentrate in the same market.
+    required_inputs:
+      - cluster.wallet_count
+      - cluster.common_funding_source
+      - cluster.funding_window_minutes
+      - cluster.combined_notional_usd
+      - cluster.market_symbol
+      - cluster.same_direction_ratio
+      - cluster.same_time_entry_ratio
+    thresholds:
+      wallet_count: 3
+      funding_window_minutes: 60
+      combined_notional_usd: 5000000
+      same_direction_ratio: 0.7
+      same_time_entry_ratio: 0.6
+    logic:
+      all_of:
+        - "cluster.wallet_count >= 3"
+        - "cluster.funding_window_minutes <= 60"
+        - "cluster.combined_notional_usd >= 5000000"
+        - "cluster.same_direction_ratio >= 0.7"
+        - "cluster.same_time_entry_ratio >= 0.6"
+    outputs:
+      alert_key: coordinated_multi_wallet
+      include:
+        - wallet_count
+        - funding_source
+        - combined_notional_usd
+        - market_symbol
+        - linked_orders_summary
+
+  - id: spoofing_wall_reversal
+    family: orderbook_manipulation
+    status: observed
+    severity: high
+    applies_to: [core_perps, hip3_perps, orderbooks]
+    description: Detects large book walls that vanish quickly and coincide with price displacement.
+    required_inputs:
+      - order.large_order_notional_usd
+      - order.cancel_time_seconds
+      - order.distance_to_mid_bps
+      - market.price_change_bps_2m
+      - market.follow_on_liquidations_usd_5m
+    thresholds:
+      large_order_notional_usd: 10000000
+      cancel_time_seconds: 120
+      distance_to_mid_bps: 100
+      price_change_bps_2m: 300
+      follow_on_liquidations_usd_5m: 1000000
+    logic:
+      all_of:
+        - "order.large_order_notional_usd >= 10000000"
+        - "order.cancel_time_seconds <= 120"
+        - "order.distance_to_mid_bps <= 100"
+      any_of:
+        - "abs(market.price_change_bps_2m) >= 300"
+        - "market.follow_on_liquidations_usd_5m >= 1000000"
+    outputs:
+      alert_key: spoofing_wall_reversal
+      include:
+        - order_notional
+        - cancel_time_seconds
+        - price_change_bps_2m
+        - liquidations_usd_5m
+
+  - id: account_behavioral_break
+    family: user_compromise
+    status: observed
+    severity: medium
+    applies_to: [wallets, bridge, withdrawals, hypercore, hyperevm]
+    description: Detects abrupt change from a wallet's normal transfer, trading, or bridge behavior.
+    required_inputs:
+      - account.baseline.destinations_entropy
+      - account.current.destinations_entropy
+      - account.new_destinations_count_24h
+      - account.bridge_count_24h
+      - account.asset_mix_shift_score
+      - account.transfer_urgency_score
+    thresholds:
+      new_destinations_count_24h: 3
+      bridge_count_24h: 2
+      asset_mix_shift_score: 0.8
+      transfer_urgency_score: 0.8
+    logic:
+      any_of:
+        - "account.new_destinations_count_24h >= 3 and account.bridge_count_24h >= 2"
+        - "account.asset_mix_shift_score >= 0.8 and account.transfer_urgency_score >= 0.8"
+    outputs:
+      alert_key: account_behavioral_break
+      include:
+        - new_destinations_count_24h
+        - bridge_count_24h
+        - asset_mix_shift_score
+        - transfer_urgency_score
+        - suspected_compromise_path
+
+  - id: arbitrary_call_surface
+    family: hyperevm_app_security
+    status: observed
+    severity: critical
+    applies_to: [hyperevm_apps, routers, integrations]
+    description: Detects router or executor patterns that can call external targets too freely.
+    required_inputs:
+      - contract.has_user_callable_execute
+      - contract.target_is_user_supplied
+      - contract.calldata_is_user_supplied
+      - contract.allowlist_scope
+      - contract.post_call_invariant_checks
+      - contract.role_required
+    thresholds:
+      allowlist_scope_max: 10
+    logic:
+      all_of:
+        - "contract.has_user_callable_execute == true"
+        - "contract.target_is_user_supplied == true or contract.calldata_is_user_supplied == true"
+      any_of:
+        - "contract.allowlist_scope == 'broad'"
+        - "contract.post_call_invariant_checks == false"
+        - "contract.role_required in ['operator','router','owner_delegate']"
+    outputs:
+      alert_key: arbitrary_call_surface
+      include:
+        - function_signatures
+        - role_model_summary
+        - allowlist_scope
+        - invariant_check_summary
+
+  - id: operator_permission_scope_creep
+    family: hyperevm_permissions
+    status: observed
+    severity: high
+    applies_to: [hyperevm_apps, operator_models]
+    description: Detects contracts or roles granted broader powers than their intended business function requires.
+    required_inputs:
+      - permission.role_name
+      - permission.allowed_actions
+      - permission.expected_actions
+      - permission.upgradeability
+      - permission.can_move_user_funds
+    thresholds:
+      extra_actions_count: 2
+    logic:
+      all_of:
+        - "count_diff(permission.allowed_actions, permission.expected_actions) >= 2"
+      any_of:
+        - "permission.can_move_user_funds == true"
+        - "permission.upgradeability == true"
+    outputs:
+      alert_key: operator_permission_scope_creep
+      include:
+        - role_name
+        - extra_actions
+        - can_move_user_funds
+        - upgradeability

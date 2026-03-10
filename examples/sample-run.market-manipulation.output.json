@@ -1,0 +1,52 @@
+{
+  "run_id": "sample-jelly-style-001",
+  "surface": "Hyperliquid core perps / HLP",
+  "alerts": [
+    {
+      "alert_key": "thin_market_squeeze_risk",
+      "severity": "high",
+      "evidence": {
+        "oi_to_depth_ratio": 10.71,
+        "largest_position_to_depth_ratio": 3.06,
+        "liquidation_to_depth_ratio": 2.13,
+        "external_anchor_divergence_bps": 240
+      },
+      "why_it_matters": "Forced liquidations could exceed realistic unwind liquidity and transfer toxic exposure into HLP."
+    },
+    {
+      "alert_key": "toxic_inventory_transfer",
+      "severity": "high",
+      "evidence": {
+        "inventory_delta_to_depth_ratio": 2.47,
+        "total_inventory_to_depth_ratio": 2.68,
+        "pnl_deterioration_15m": -6900000
+      },
+      "why_it_matters": "Protocol-controlled inventory is growing faster than the market can safely absorb."
+    },
+    {
+      "alert_key": "settlement_cliff",
+      "severity": "medium",
+      "evidence": {
+        "mark_oracle_bps": 81.63,
+        "mark_anchor_bps": 1069.57,
+        "settlement_reference_price": 0.0095
+      },
+      "why_it_matters": "The market is approaching a regime where different price paths imply different outcomes for traders and the protocol."
+    },
+    {
+      "alert_key": "crisis_centralization_trigger",
+      "severity": "high",
+      "evidence": {
+        "pnl_deterioration_15m": -6900000,
+        "delisting_risk_flags_true": 2,
+        "manual_override_capability": true
+      },
+      "why_it_matters": "The system is likely approaching a manual-response state that changes incentives and settlement expectations."
+    }
+  ],
+  "recommended_next_steps": [
+    "Simulate forced unwind through top 10 levels and stressed 2% depth.",
+    "Estimate HLP loss if inherited inventory is unwound over 5m, 15m, and 60m windows.",
+    "Review whether emergency settlement rules create attacker advantage."
+  ]
+}

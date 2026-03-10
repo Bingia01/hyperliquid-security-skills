@@ -1,0 +1,30 @@
+{
+  "contract": {
+    "name": "Router",
+    "has_user_callable_execute": true,
+    "target_is_user_supplied": true,
+    "calldata_is_user_supplied": true,
+    "allowlist_scope": "broad",
+    "post_call_invariant_checks": false,
+    "role_required": "operator",
+    "function_signatures": [
+      "execute(address target, bytes data)",
+      "setOperator(address user, bool approved)"
+    ]
+  },
+  "permission": {
+    "role_name": "operator",
+    "allowed_actions": [
+      "move_user_funds",
+      "call_whitelisted_contracts",
+      "roll_positions",
+      "sweep_rewards"
+    ],
+    "expected_actions": [
+      "roll_positions",
+      "sweep_rewards"
+    ],
+    "upgradeability": true,
+    "can_move_user_funds": true
+  }
+}

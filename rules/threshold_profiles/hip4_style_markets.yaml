@@ -1,0 +1,12 @@
+profile: hip4_style_markets
+description: Prediction-market or bounded-payoff style thresholds; focuses on settlement
+  cliffs, anchoring weakness, and thin-depth squeezes rather than leverage cascades.
+thresholds:
+  probability_price_jump_warn: 0.08
+  probability_price_jump_crit: 0.15
+  outcome_book_depth_warn_usd: 50000
+  outcome_book_depth_crit_usd: 25000
+  anchor_divergence_bps_warn: 200
+  anchor_divergence_bps_crit: 400
+  final_window_trade_concentration_warn: 0.25
+  final_window_trade_concentration_crit: 0.4
