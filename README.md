@@ -1,4 +1,4 @@
-# Hyperliquid Security for Claude Code
+# Hyperliquid Security Skills for Claude Code
 
 Open-source research framework for classifying, reconstructing, and analyzing Hyperliquid-class incidents across core protocol surfaces, market-structure abuse, user/account compromise, and HyperEVM ecosystem applications.
 
