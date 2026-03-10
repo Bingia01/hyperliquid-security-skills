@@ -6,8 +6,6 @@ Open-source research framework for classifying, reconstructing, and analyzing Hy
 
 A structured knowledge base and Claude Code skill pack for reasoning about Hyperliquid security incidents. You give it an incident (a hack, an exploit, a suspicious event). It helps you classify it, reconstruct what happened step by step, extract the reusable mechanics, identify which safety properties broke, and draft detection rules.
 
-If you're building on HyperEVM and want a pre-ship security check, it walks through each vulnerability class from the HyperEVM taxonomy and checks your code for matching patterns, producing findings with line numbers and fix recommendations.
-
 The core pipeline:
 
 ```
@@ -17,6 +15,8 @@ incident → attack movie → primitive → invariant → heuristic → rule →
 Each stage has a corresponding Claude Code skill, reference documents, and templates.
 
 This repository teaches a research methodology and provides the structured data to apply it. Building production tools on top of it is a separate effort (see `docs/OPEN_SOURCE_BOUNDARY.md`).
+
+**If you're building on HyperEVM and want a pre-ship security check**, it checks your code for matching patterns, producing findings with line numbers and fix recommendations.
 
 ## How to use this repo
 
