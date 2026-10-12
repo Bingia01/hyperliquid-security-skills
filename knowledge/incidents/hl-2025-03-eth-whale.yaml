@@ -1,0 +1,71 @@
+id: hl-2025-03-eth-whale
+title: 50x ETH long exits through liquidation after withdrawing margin
+period: {start: 2025-03-12, end: 2025-03-12}
+summary: >-
+  A trader built a 50x ETH long of about 160,000 ETH (~$307M), then withdrew
+  collateral instead of closing. The position was backstop-liquidated and the
+  HLP liquidator unwound it at about $4M of slippage, while the trader kept
+  about $1.86M. Hyperliquid said there was no exploit; the rules allowed
+  withdrawing unrealized profit down to initial margin.
+control_owner: hypercore
+mechanisms: [design_exploit]
+code_defect: absent
+surfaces: [core_perps]
+losses:
+  - bearer: HLP depositors
+    amount_usd_low: 4.0e6
+    amount_usd_high: 4.0e6
+    basis: realized
+    claims: [hlp_loss]
+sources:
+  - {id: arkham, title: Hyperliquid whale passes $4M loss to HLP vault, publisher: Arkham Research, url: "https://info.arkm.com/research/hyperliquid-whale-passes-4m-loss-to-hlp-vault", tier: technical_secondary, published: 2025-03-12}
+  - {id: theblock, title: HYPE drops after HLP vault loss on whale liquidation, publisher: The Block, url: "https://www.theblock.co/post/345866/hype-drop-hlp-vault-loss-hyperliquid-whale-liquidation", tier: news, published: 2025-03-12}
+  - {id: dlnews, title: Hyperliquid denies hack after investors suffer HLP loss, publisher: DL News, url: "https://www.dlnews.com/articles/defi/hyperliquid-denies-hack-after-investors-suffer-hlp-loss/", tier: news, published: 2025-03-12}
+  - {id: techflow, title: Hyperliquid margin transfer changes (PANews), publisher: TechFlow, url: "https://www.techflowpost.com/en-US/article/24304", tier: news, published: 2025-03-14}
+  - {id: docs_margining, title: Margining, publisher: Hyperliquid Docs, url: "https://hyperliquid.gitbook.io/hyperliquid-docs/trading/margining", tier: primary}
+claims:
+  - id: position
+    statement: The trader built a 50x long of about 160,234 ETH (~$307M) from about $15.2M of deposits; other outlets report sizes from ~$200M to ~$340M.
+    sources: [theblock, arkham]
+    core: true
+  - id: withdrawal
+    statement: The trader withdrew collateral while in profit, which raised the liquidation price, and was liquidated; Hyperliquid stated there was no protocol exploit or hack.
+    sources: [arkham, theblock, dlnews]
+    core: true
+  - id: hlp_loss
+    statement: The HLP liquidator took over the position and lost about $4M unwinding it; the trader netted about $1.86M.
+    sources: [arkham, theblock]
+    core: true
+  - id: leverage_cut
+    statement: Hyperliquid cut maximum leverage to 40x for BTC and 25x for ETH.
+    sources: [theblock]
+  - id: transfer_margin_2025
+    statement: From the 2025-03-15 upgrade, transfers out of positions required a 20% margin ratio.
+    sources: [techflow]
+  - id: transfer_margin_now
+    statement: Current rules require transfer margin of max(initial margin, 10% of total position value).
+    sources: [docs_margining]
+movie:
+  - phase: preconditions
+    description: Rules allowed withdrawing unrealized profit down to initial margin; the backstop took over positions the book could not absorb.
+    claims: [transfer_margin_now]
+  - phase: setup
+    description: The trader builds a ~$307M 50x ETH long.
+    claims: [position]
+  - phase: trigger
+    description: The trader withdraws collateral instead of closing.
+    claims: [withdrawal]
+  - phase: protocol_reaction
+    description: The position is backstop-liquidated and taken over by the HLP liquidator.
+    claims: [hlp_loss]
+  - phase: loss
+    description: HLP unwinds the position at about $4M of slippage; the trader keeps about $1.86M.
+    claims: [hlp_loss]
+  - phase: response
+    description: Leverage caps lowered; a margin requirement added for transfers.
+    claims: [leverage_cut, transfer_margin_2025]
+primitives: [collateral_withdrawal_toward_liquidation, liquidation_cheaper_than_market_exit, exposure_exceeds_depth, backstop_inherits_unexitable_position]
+invariants_violated: [liquidation_not_cheaper_exit, loss_containment]
+response: Max leverage reduced; transfer margin requirement introduced (20% at the time, 10% of position value in current docs).
+open_questions:
+  - Position size figures conflict between outlets ($200M to $340M).

@@ -1,5 +1,40 @@
 # Changelog
 
+## v3.0.0
+
+Rebuilt from first principles; see `docs/DESIGN.md` for the full rationale and
+the defects found in v2.
+
+- **Knowledge base as validated data.** `knowledge/` holds the ontology,
+  feature dictionary, incidents, rules and profiles; pydantic models reject
+  unknown keys; a strict YAML loader rejects duplicate keys.
+- **Two-axis classification** (`control_owner`, `mechanisms`, `code_defect`)
+  replaces the four-bucket / five-surface / A-D schemes, which disagreed.
+- **Derived evidence tiers** from claim-level sources replace asserted
+  `status` / `confidence` / `confidence_score`.
+- **Rule engine.** Safe expression language with unit and scope checking,
+  three-valued logic (`unknown` on missing data), named thresholds, profiles
+  that override by name, fixtures that must pass.
+- **Evidence policy enforced in code.** Research leads cannot raise a rule's
+  status; alerting needs a credible anchor and a reconstructed or recorded
+  firing fixture; anchors must exhibit the primitives a rule detects.
+- **Read-only public API adapter** with correct depth measurement (v2's method
+  undercounted depth within 2% by 6x-94x) and HLP liquidator child vaults.
+- **Incidents corrected and extended.** JELLY loss relabeled as peak
+  unrealized (HLP ended about +$703K) with source disagreements recorded;
+  added XPL hyperp squeeze, July 2025 API outage, October 2025
+  auto-deleveraging, FARTCOIN, Purrlend and the xyz:SKHYNIX HIP-3 oracle
+  failure.
+- **Rules rewritten.** Fixed the arbitrary-call blind spot, the
+  two-excess-powers requirement, the unused funding-link input and the
+  vault-wide-over-single-market ratio; thresholds are relative to depth,
+  equity or stake.
+- **Skills** moved to `.claude/skills/<name>/SKILL.md` so Claude Code loads
+  them; eleven specifications consolidated into four.
+- **Generated reports** replace hand-kept consistency and coverage matrices.
+- CI: lint, format, strict typing, tests, validation, report freshness.
+
+
 ## v2
 
 ### Skill specification expansion

@@ -1,0 +1,64 @@
+id: large_position_near_liquidation
+title: A position the book cannot absorb sits near its liquidation price
+summary: >-
+  If a position larger than the depth it would liquidate into is close to its
+  liquidation price, liquidation will hand it to the backstop. Whether the
+  trader got there by price movement or by withdrawing margin (the March 2025
+  ETH case), the backstop's exposure is the same.
+stage: precondition
+mode: report
+severity: high
+consumer: Risk analysts; the protocol's risk team
+action: Estimate the backstop's unwind cost; watch for margin withdrawals from the account.
+applies_to: [core_perps, hyperps, hip3_perps]
+scope: [account, market]
+detects: [liquidation_cheaper_than_market_exit, exposure_exceeds_depth]
+protects: [liquidation_not_cheaper_exit, loss_containment]
+anchors: [hl-2025-03-eth-whale, hl-2025-03-jelly]
+thresholds:
+  max_position_to_depth:
+    value: 1.0
+    unit: ratio
+    basis: placeholder
+  max_liquidation_distance_bps:
+    value: 300.0
+    unit: bps
+    basis: placeholder
+    note: Since 2025 a margin withdrawal must leave max(initial margin, 10% of position value), so reaching this distance usually needs adverse price movement as well.
+condition:
+  all:
+    - account.liquidation_distance_bps <= threshold.max_liquidation_distance_bps
+    - any:
+        - account.position_side == 'long' and account.position_notional_usd / market.bid_depth_usd_2pct >= threshold.max_position_to_depth
+        - account.position_side == 'short' and account.position_notional_usd / market.ask_depth_usd_2pct >= threshold.max_position_to_depth
+report:
+  liquidation_distance_bps: account.liquidation_distance_bps
+  position_notional_usd: account.position_notional_usd
+false_positives:
+  - scenario: A market maker's hedged inventory appears as one large position on one account.
+    distinguisher: Check the owner's other accounts and venues for offsetting exposure.
+  - scenario: The position is being reduced in steps on the book.
+    distinguisher: Position notional falls across consecutive snapshots.
+limitations:
+  - Finding large accounts needs node data or trade feeds; the public API answers only for named accounts.
+fixtures:
+  - name: oversized long near liquidation fires
+    expect: fires
+    provenance: synthetic
+    surface: core_perps
+    values: {account.position_side: long, account.position_notional_usd: 300.0e6, account.liquidation_distance_bps: 150.0, market.bid_depth_usd_2pct: 60.0e6, market.ask_depth_usd_2pct: 60.0e6}
+  - name: oversized long far from liquidation is silent
+    expect: silent
+    provenance: synthetic
+    surface: core_perps
+    values: {account.position_side: long, account.position_notional_usd: 300.0e6, account.liquidation_distance_bps: 1500.0, market.bid_depth_usd_2pct: 60.0e6, market.ask_depth_usd_2pct: 60.0e6}
+  - name: short is measured against asks, not bids
+    expect: silent
+    provenance: synthetic
+    surface: core_perps
+    values: {account.position_side: short, account.position_notional_usd: 50.0e6, account.liquidation_distance_bps: 100.0, market.bid_depth_usd_2pct: 1.0e6, market.ask_depth_usd_2pct: 80.0e6}
+  - name: missing depth is unknown
+    expect: unknown
+    provenance: synthetic
+    surface: core_perps
+    values: {account.position_side: long, account.position_notional_usd: 300.0e6, account.liquidation_distance_bps: 150.0}

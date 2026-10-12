@@ -1,0 +1,46 @@
+id: hl-2025-09-hypervault
+title: HyperVault operators withdraw $3.6M and disappear
+period: {start: 2025-09-26, end: 2025-09-26}
+summary: >-
+  PeckShield flagged an abnormal withdrawal of about $3.6M from HyperVault, a
+  HyperEVM yield vault advertising very high APY. Funds were bridged to
+  Ethereum, swapped to ETH, and about 752 ETH sent to Tornado Cash; the
+  project's website and social accounts were deleted. Intent is inferred from
+  behavior; there is no team statement.
+control_owner: hyperevm_application
+mechanisms: [insider_abuse]
+code_defect: undetermined
+surfaces: [hyperevm_apps]
+losses:
+  - bearer: HyperVault depositors
+    amount_usd_low: 3.6e6
+    amount_usd_high: 3.6e6
+    basis: reported_unspecified
+    claims: [withdrawal]
+sources:
+  - {id: theblock, title: DeFi protocol HyperVault vanishes after $3.6 million suspected rugpull, publisher: The Block, url: "https://www.theblock.co/post/372497/defi-protocol-hypervault-vanishes-after-3-6-million-suspected-rugpull", tier: news, published: 2025-09-26}
+  - {id: decrypt, title: $3.6M drained from Hyperliquid DeFi platform HyperVault in abnormal withdrawal, publisher: Decrypt, url: "https://decrypt.co/341539/3-6m-drained-from-hyperliquid-defi-platform-hypervault-in-abnormal-withdrawal", tier: news, published: 2025-09-26}
+claims:
+  - id: withdrawal
+    statement: About $3.6M was withdrawn from HyperVault in what PeckShield called an abnormal withdrawal, bridged to Ethereum and swapped to ETH, with about 752 ETH deposited to Tornado Cash.
+    sources: [theblock, decrypt]
+    core: true
+  - id: disappearance
+    statement: The project's website, X account and Discord were deleted.
+    sources: [theblock, decrypt]
+    core: true
+movie:
+  - phase: preconditions
+    description: Depositors' funds were under operator control with no evident on-chain constraint.
+    claims: []
+  - phase: trigger
+    description: Operators withdraw about $3.6M.
+    claims: [withdrawal]
+  - phase: loss
+    description: Funds bridged, swapped and mixed; project presence deleted.
+    claims: [withdrawal, disappearance]
+primitives: [operator_fund_extraction, custodial_operator_control]
+invariants_violated: [custody_conservation, operator_bond_covers_abuse]
+response: None from the team; security firms and DefiLlama flagged it.
+open_questions:
+  - Exit scam or compromise of operator keys? Deleted socials point to the former.

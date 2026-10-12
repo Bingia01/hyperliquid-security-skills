@@ -1,0 +1,33 @@
+id: hl-2024-12-dprk-wallets
+title: DPRK-attributed wallets trading on Hyperliquid trigger record outflows
+period: {start: 2024-12-22, end: 2024-12-24}
+summary: >-
+  A researcher flagged addresses attributed to North Korea trading on
+  Hyperliquid and warned they might be preparing an attack. No exploit
+  followed; Hyperliquid said all funds were accounted for. Concern drove
+  record net USDC outflows (about $249M on 23 December).
+control_owner: hypercore
+mechanisms: [reconnaissance]
+code_defect: absent
+surfaces: [core_perps]
+sources:
+  - {id: theblock, title: Hyperliquid sees record outflows following North Korea hack concerns, publisher: The Block, url: "https://www.theblock.co/post/332298/hyperliquid-sees-record-outflows-following-north-korea-hack-concerns", tier: news, published: 2024-12-24}
+claims:
+  - id: flagged
+    statement: Addresses attributed to North Korea were observed trading on Hyperliquid; Hyperliquid stated there had been no exploit and all user funds were accounted for.
+    sources: [theblock]
+    core: true
+  - id: outflows
+    statement: Net USDC outflows reached about $249M on 23 December 2024.
+    sources: [theblock]
+movie:
+  - phase: trigger
+    description: Public attribution of trading wallets to DPRK.
+    claims: [flagged]
+  - phase: response
+    description: Users withdraw heavily; Hyperliquid denies any exploit.
+    claims: [outflows, flagged]
+primitives: []
+invariants_violated: []
+open_questions:
+  - Were the addresses probing for a vulnerability or simply trading?

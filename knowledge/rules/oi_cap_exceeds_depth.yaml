@@ -1,0 +1,54 @@
+id: oi_cap_exceeds_depth
+title: HIP-3 open interest cap allows positions the book cannot absorb
+summary: >-
+  A deployer's open interest cap is the largest exposure its market can build.
+  If the cap is many times the thinner side of the book, the deployer has
+  allowed more exposure than its backstop liquidator can exit.
+stage: precondition
+mode: report
+severity: medium
+consumer: HIP-3 deployers; traders choosing which dex to use
+action: Lower the cap with setOpenInterestCaps, or deepen liquidity before raising it.
+applies_to: [hip3_perps]
+scope: [market]
+detects: [exposure_exceeds_depth]
+protects: [loss_containment]
+anchors: []
+thresholds:
+  max_cap_to_depth:
+    value: 100.0
+    unit: ratio
+    basis: placeholder
+    note: Same caveat as open_interest_exceeds_depth; caps are upper bounds, so the ratio is looser.
+condition: >-
+  market.oi_cap_usd / min(market.bid_depth_usd_2pct, market.ask_depth_usd_2pct)
+  >= threshold.max_cap_to_depth
+report:
+  cap_to_thinner_side_depth: market.oi_cap_usd / min(market.bid_depth_usd_2pct, market.ask_depth_usd_2pct)
+  cap_utilization: market.open_interest_usd / market.oi_cap_usd
+false_positives:
+  - scenario: Caps set high deliberately for an asset with deep liquidity on other venues and active arbitrage.
+    distinguisher: Check depth again during the underlying's active session (equities) or after market makers have quoted for a while.
+limitations:
+  - Caps are configuration, so this rule says what could happen, not what is happening.
+fixtures:
+  - name: generous cap on a thin book fires
+    expect: fires
+    provenance: synthetic
+    surface: hip3_perps
+    values: {market.oi_cap_usd: 25.0e6, market.bid_depth_usd_2pct: 0.1e6, market.ask_depth_usd_2pct: 0.2e6, market.open_interest_usd: 1.0e6}
+  - name: cap matched to depth is silent
+    expect: silent
+    provenance: synthetic
+    surface: hip3_perps
+    values: {market.oi_cap_usd: 25.0e6, market.bid_depth_usd_2pct: 2.0e6, market.ask_depth_usd_2pct: 2.0e6, market.open_interest_usd: 1.0e6}
+  - name: validator-operated markets have no deployer cap
+    expect: not_applicable
+    provenance: synthetic
+    surface: core_perps
+    values: {}
+  - name: no cap published means unknown
+    expect: unknown
+    provenance: synthetic
+    surface: hip3_perps
+    values: {market.bid_depth_usd_2pct: 0.1e6, market.ask_depth_usd_2pct: 0.2e6}

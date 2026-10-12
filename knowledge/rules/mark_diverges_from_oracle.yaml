@@ -1,0 +1,55 @@
+id: mark_diverges_from_oracle
+title: Mark price diverges from the oracle
+summary: >-
+  On validator-operated perps the oracle tracks external spot, while the mark
+  also includes Hyperliquid's own book. A large gap means Hyperliquid's book is
+  pricing the asset away from external venues - thin-book pushes or stale
+  oracle inputs. On HIP-3 markets it can also mean the deployer's mark inputs
+  and oracle disagree.
+stage: active_attack
+mode: report
+severity: medium
+consumer: Risk analysts; HIP-3 deployers
+action: Inspect recent trades and the order book for pushes; for HIP-3, inspect the deployer's oracle and mark inputs.
+applies_to: [core_perps, hip3_perps]
+scope: [market]
+detects: [book_price_push]
+protects: [price_integrity]
+anchors: []
+thresholds:
+  max_mark_oracle_bps:
+    value: 150.0
+    unit: bps
+    basis: placeholder
+condition: bps_diff(market.mark_price, market.oracle_price) >= threshold.max_mark_oracle_bps
+report:
+  mark_oracle_bps: bps_diff(market.mark_price, market.oracle_price)
+false_positives:
+  - scenario: Fast external moves - the mark's 150-second basis EMA lags the oracle.
+    distinguisher: The gap closes within a few minutes without trades on Hyperliquid driving it.
+  - scenario: External venues halted or closed (weekend equities on HIP-3) while Hyperliquid trades.
+    distinguisher: Check the oracle's source venues' trading status.
+limitations:
+  - Not applied to hyperps, whose oracle is an average of their own mark, so divergence there is expected during trends.
+  - When the attacker moves the external venues themselves (JELLY), mark and oracle move together and this rule stays silent.
+fixtures:
+  - name: wide gap fires
+    expect: fires
+    provenance: synthetic
+    surface: core_perps
+    values: {market.mark_price: 0.51, market.oracle_price: 0.47}
+  - name: normal basis is silent
+    expect: silent
+    provenance: synthetic
+    surface: core_perps
+    values: {market.mark_price: 100.5, market.oracle_price: 100.0}
+  - name: hyperps are excluded by design
+    expect: not_applicable
+    provenance: synthetic
+    surface: hyperps
+    values: {market.mark_price: 2.0, market.oracle_price: 1.0}
+  - name: missing oracle is unknown
+    expect: unknown
+    provenance: synthetic
+    surface: hip3_perps
+    values: {market.mark_price: 100.0}

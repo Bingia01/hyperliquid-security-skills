@@ -1,0 +1,40 @@
+id: hl-2026-04-fartcoin
+title: FARTCOIN longs from four wallets pumped and liquidated onto HLP
+period: {start: 2026-04-09, end: 2026-04-09}
+summary: >-
+  About $15M of FARTCOIN longs across four wallets were pumped about 25% and
+  then liquidated into thin liquidity, costing HLP about $1.5M by PeckShield's
+  estimate, with auto-deleveraging paying about $849K to shorts. Single news
+  source; kept as a research lead.
+control_owner: hypercore
+mechanisms: [market_manipulation]
+code_defect: absent
+surfaces: [core_perps]
+losses:
+  - bearer: HLP depositors
+    amount_usd_low: 1.5e6
+    amount_usd_high: 1.5e6
+    basis: reported_unspecified
+    claims: [hlp_loss]
+sources:
+  - {id: forklog, title: Unknown attackers exploit Hyperliquid via FARTCOIN pump, publisher: ForkLog, url: "https://forklog.com/en/unknown-attackers-exploit-hyperliquid-storage-via-fartcoin-pump", tier: news}
+claims:
+  - id: setup
+    statement: About $15M (145.24M FARTCOIN) of longs were opened across four wallets, pumped about 25%, then liquidated in thin liquidity.
+    sources: [forklog]
+    core: true
+  - id: hlp_loss
+    statement: HLP lost about $1.5M per PeckShield; auto-deleveraging paid about $849K to shorts.
+    sources: [forklog]
+movie:
+  - phase: setup
+    description: Longs split across four wallets.
+    claims: [setup]
+  - phase: trigger
+    description: Pump, then liquidation into thin liquidity.
+    claims: [setup]
+  - phase: loss
+    description: HLP loss and auto-deleveraging.
+    claims: [hlp_loss]
+primitives: [capital_sharding, book_price_push, exposure_exceeds_depth, backstop_inherits_unexitable_position]
+invariants_violated: [loss_containment, price_integrity]

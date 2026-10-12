@@ -1,0 +1,63 @@
+id: hl-2025-11-popcat
+title: POPCAT longs from 19 sharded wallets and a pulled buy wall push losses onto HLP
+period: {start: 2025-11-12, end: 2025-11-13}
+summary: >-
+  About $3M withdrawn from OKX was split across 19 new wallets that opened $20M
+  to $30M of leveraged POPCAT longs. A buy wall of about $20M near $0.21 was
+  placed and then pulled; POPCAT fell about 30%, the longs were liquidated, the
+  book could not absorb them, and HLP inherited them, losing about $4.9M. The
+  attacker's $3M was lost; any off-venue hedge is unproven.
+control_owner: hypercore
+mechanisms: [market_manipulation]
+code_defect: absent
+surfaces: [core_perps]
+losses:
+  - bearer: HLP depositors
+    amount_usd_low: 4.5e6
+    amount_usd_high: 4.9e6
+    basis: realized
+    claims: [hlp_loss]
+sources:
+  - {id: halborn, title: "Explained: the Hyperliquid hack (November 2025)", publisher: Halborn, url: "https://www.halborn.com/blog/post/explained-the-hyperliquid-hack-november-2025", tier: technical_secondary, published: 2025-11-14}
+  - {id: theblock, title: Hyperliquid pauses deposits and withdrawals amid POPCAT trading scheme speculation, publisher: The Block, url: "https://www.theblock.co/post/378606/hyperliquid-pauses-deposits-withdrawals-popcat-trading-scheme-speculation", tier: news, published: 2025-11-12}
+  - {id: cointelegraph, title: Hyperliquid HLP hit as POPCAT attack wipes out $3M, publisher: Cointelegraph, url: "https://cointelegraph.com/news/hyperliquid-hlp-popcat-attack-3m-wipeout", tier: news, published: 2025-11-13}
+claims:
+  - id: sharding
+    statement: About $3M USDC withdrawn from OKX was split across 19 new wallets that opened leveraged POPCAT longs of $20M to $30M.
+    sources: [halborn, cointelegraph, theblock]
+    core: true
+  - id: wall
+    statement: A buy wall of about $20M near $0.21 was placed and then pulled, after which POPCAT fell about 30%.
+    sources: [halborn, theblock]
+    core: true
+  - id: inheritance
+    statement: The longs were liquidated, the book could not absorb them, and HLP inherited the positions.
+    sources: [halborn, cointelegraph]
+    core: true
+  - id: hlp_loss
+    statement: HLP lost about $4.5M to $4.9M; the attacker's $3M was wiped out.
+    sources: [cointelegraph, halborn]
+  - id: bridge_pause
+    statement: Arbitrum bridge deposits and withdrawals were paused for a period the same day; no official statement linked the pause to POPCAT.
+    sources: [theblock]
+movie:
+  - phase: setup
+    description: OKX withdrawal split across 19 fresh wallets; $20M-$30M of longs opened.
+    claims: [sharding]
+  - phase: trigger
+    description: A ~$20M bid wall is placed, then pulled.
+    claims: [wall]
+  - phase: protocol_reaction
+    description: Price falls ~30%; longs liquidate; the book cannot absorb them; HLP inherits.
+    claims: [inheritance]
+  - phase: loss
+    description: HLP realizes about $4.9M of loss.
+    claims: [hlp_loss]
+  - phase: response
+    description: Bridge briefly paused (link to POPCAT unconfirmed).
+    claims: [bridge_pause]
+primitives: [capital_sharding, spoof_wall, exposure_exceeds_depth, backstop_inherits_unexitable_position]
+invariants_violated: [price_integrity, loss_containment]
+response: No POPCAT-specific parameter change was found.
+open_questions:
+  - Did the attacker profit through a hedge on another venue? Losing $3M to cost HLP $4.9M only makes sense with one.

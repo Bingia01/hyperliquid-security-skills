@@ -1,0 +1,36 @@
+id: hl-2023-snx-lead
+title: Reported SNX price push against HLP (unverified)
+period: {start: 2023-01-01, end: 2023-12-31}
+summary: >-
+  One article states that a trader pumped SNX on a centralized exchange and
+  withdrew about $37K from HLP. No date, analysis or second source was found,
+  and an unofficial incident log lists other 2023 oracle events but not this
+  one. Kept as a research lead; it may be a conflation.
+control_owner: hypercore
+mechanisms: [market_manipulation]
+code_defect: undetermined
+surfaces: [core_perps]
+losses:
+  - bearer: HLP depositors
+    amount_usd_low: 37.0e3
+    amount_usd_high: 37.0e3
+    basis: reported_unspecified
+    claims: [report]
+sources:
+  - {id: incrypted, title: The secret of Hyperliquid, publisher: Incrypted, url: "https://incrypted.com/en/the-secret-of-hyperliquid/", tier: news}
+claims:
+  - id: report
+    statement: A trader pumped SNX on a centralized exchange and withdrew about $37K USDC from HLP.
+    sources: [incrypted]
+    core: true
+movie:
+  - phase: trigger
+    description: External SNX price pushed.
+    claims: [report]
+  - phase: loss
+    description: About $37K extracted from HLP.
+    claims: [report]
+primitives: [external_price_push, thin_external_price_source]
+invariants_violated: [price_integrity]
+open_questions:
+  - Did this happen at all? Exact date? The period field spans 2023 because no date is known.

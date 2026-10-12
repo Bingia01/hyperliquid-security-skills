@@ -1,0 +1,111 @@
+id: hl-2025-03-jelly
+title: JELLY short handed to the HLP liquidator, then squeezed by an external pump
+period: {start: 2025-03-26, end: 2025-03-26}
+summary: >-
+  One actor held a JELLY short of about $4.1M-$4.5M against roughly equal
+  longs across several accounts. The short passed to HLP through the
+  liquidation backstop, and JELLY was pushed up on outside venues, taking HLP to
+  roughly $12M of unrealized loss. Validators closed positions at $0.0095, the
+  attacker's short entry, overriding the oracle; HLP ended about $703K in
+  profit. The three technical write-ups disagree on position sizes and on
+  whether margin withdrawal or the price rise triggered the liquidation.
+control_owner: hypercore
+mechanisms: [market_manipulation, design_exploit]
+code_defect: absent
+surfaces: [core_perps]
+losses:
+  - bearer: HLP depositors (peak, before settlement)
+    amount_usd_low: 10.5e6
+    amount_usd_high: 13.5e6
+    basis: peak_unrealized
+    claims: [peak_loss]
+  - bearer: HLP depositors (final)
+    amount_usd_low: 0.0
+    amount_usd_high: 0.0
+    basis: realized
+    claims: [hlp_final]
+sources:
+  - {id: arkham, title: JellyJelly exploit on Hyperliquid, publisher: Arkham Research, url: "https://info.arkm.com/research/jellyjelly-exploit-on-hyperliquid", tier: technical_secondary, published: 2025-03-26}
+  - {id: oak, title: "Hyperliquid JELLY attack: context, vulnerability, team solution", publisher: OAK Research, url: "https://oakresearch.io/en/analyses/investigations/hyperliquid-jelly-attack-context-vulnerability-team-solution", tier: technical_secondary, published: 2025-03-28}
+  - {id: halborn, title: "Explained: the Hyperliquid hack (March 2025)", publisher: Halborn, url: "https://www.halborn.com/blog/post/explained-the-hyperliquid-hack-march-2025", tier: technical_secondary, published: 2025-04-02}
+  - {id: cryptobriefing, title: Hyperliquid delists JELLY after market manipulation, publisher: Crypto Briefing, url: "https://cryptobriefing.com/hyperliquid-market-manipulation-jelly/", tier: news, published: 2025-03-26}
+  - {id: theblock, title: Hyperliquid delists JELLYJELLY memecoin amid whale manipulation fiasco, publisher: The Block, url: "https://www.theblock.co/post/348314/hyperliquid-delists-jellyjelly-memecoin-amid-whale-manipulation-fiasco", tier: news, published: 2025-03-26}
+  - {id: mpost, title: Hyperliquid to compensate users with JELLY long positions and strengthen risk management, publisher: MPost, url: "https://mpost.io/hyperliquid-to-compensate-users-with-jelly-long-positions-and-strengthen-risk-management-following-whale-manipulation-incident", tier: news, published: 2025-03-28}
+  - {id: docs_delisting, title: Delisting, publisher: Hyperliquid Docs, url: "https://hyperliquid.gitbook.io/hyperliquid-docs/trading/delisting", tier: primary}
+claims:
+  - id: accounts
+    statement: Accounts controlled by one actor held a JELLY short of about $4.1M to $4.5M against two longs of roughly equal combined size.
+    sources: [arkham, oak, halborn]
+    core: true
+  - id: account_details
+    statement: Arkham reports three accounts - a $4.1M short and longs of $2.15M and $1.9M - that deposited $7.17M and withdrew about $6.26M; OAK reports a $4.5M short and two longs of about $2.5M each.
+    sources: [arkham, oak]
+  - id: inheritance
+    statement: The short ended up held by HLP through the liquidation backstop.
+    sources: [arkham, oak, halborn]
+    core: true
+  - id: book_could_not_clear
+    statement: HLP could not clear the inherited short on the book.
+    sources: [arkham]
+  - id: pump
+    statement: JELLY's price was pushed up on outside venues, raising HLP's mark-to-market loss on the short.
+    sources: [arkham, halborn, oak]
+    core: true
+  - id: trigger_contested
+    statement: Sources disagree on what triggered the liquidation - OAK says the trader withdrew margin gradually to force it; Arkham says the price rise did; Halborn places the pump before the inheritance.
+    sources: [oak, arkham, halborn]
+  - id: peak_loss
+    statement: HLP's inherited short showed roughly $12M of unrealized loss.
+    sources: [oak, cryptobriefing]
+  - id: delisting
+    statement: After evidence of suspicious activity, the validator set convened and voted to delist JELLY perps.
+    sources: [theblock, cryptobriefing, arkham, halborn]
+    core: true
+  - id: settlement
+    statement: Positions were closed at $0.0095 (the attacker's short entry) rather than at the oracle price.
+    sources: [arkham, halborn]
+    core: true
+  - id: oracle_ignored
+    statement: OAK reports that validators voted to close the position by ignoring the JELLY oracle price.
+    sources: [oak]
+  - id: hlp_final
+    statement: Per Lookonchain, HLP closed 392M JELLY at $0.0095 for a profit of about $703K.
+    sources: [arkham, cryptobriefing]
+  - id: compensation
+    statement: Hyperliquid said all users apart from flagged addresses would be made whole by the Hyper Foundation; long holders were refunded as if JELLY settled at 0.037555.
+    sources: [cryptobriefing, mpost, theblock]
+  - id: changes
+    statement: Afterwards the liquidator's share of HLP was capped, auto-deleveraging was tied to the liquidator's own losses, and the open interest cap formula was changed to account for market capitalization.
+    sources: [oak, mpost]
+  - id: current_delisting_rule
+    statement: Current rules settle a delisted market at the one-hour time-weighted oracle price before the vote, not at a chosen price.
+    sources: [docs_delisting]
+movie:
+  - phase: preconditions
+    description: A thin JELLY perp, an oracle drawing on thin outside spot venues, and an uncapped liquidator that inherited positions the book could not clear.
+    claims: [book_could_not_clear]
+  - phase: setup
+    description: One actor funds several accounts and opens a short of about $4.1M-$4.5M against roughly equal longs.
+    claims: [accounts, account_details]
+  - phase: trigger
+    description: The short is liquidated - by margin withdrawal or by the price rise; sources disagree.
+    claims: [trigger_contested]
+  - phase: protocol_reaction
+    description: The short passes to HLP through the backstop and cannot be cleared on the book.
+    claims: [inheritance, book_could_not_clear]
+  - phase: amplification
+    description: Buying on outside venues lifts the oracle and mark, deepening HLP's unrealized loss.
+    claims: [pump, peak_loss]
+  - phase: response
+    description: Validators close positions at $0.0095, overriding the oracle; the Foundation compensates unflagged users.
+    claims: [delisting, settlement, oracle_ignored, compensation]
+  - phase: loss
+    description: HLP's final result is a gain of about $703K; the ad hoc settlement price, not the market, decided the outcome.
+    claims: [hlp_final]
+primitives: [self_opposed_positions, external_price_push, thin_external_price_source, exposure_exceeds_depth, backstop_inherits_unexitable_position, discretionary_crisis_settlement]
+invariants_violated: [loss_containment, price_integrity, rule_stability]
+response: Delisting, settlement at the attacker's entry price, Foundation compensation, then liquidator cap and open interest cap changes.
+open_questions:
+  - Did margin withdrawal or the price rise trigger the short's liquidation?
+  - Did the actor hold offsetting positions on other venues?
+citations_checked: true

@@ -1,0 +1,47 @@
+id: oracle_setter_holds_position
+title: An address that can set a HIP-3 market's price holds a position in it
+summary: >-
+  HIP-3 deployers, their oracle updater and sub-deployers granted setOracle
+  publish the prices their market marks to, and the deployer can halt trading,
+  which settles every position at mark. If any of those addresses holds a
+  position in the market, the party setting the price profits from moving it.
+stage: precondition
+mode: report
+severity: high
+consumer: Traders on the dex; validators reviewing slashing; the deployer's own compliance
+action: Ask the deployer to explain or close the position; weigh the dex's stake against the position size.
+applies_to: [hip3_perps]
+scope: [market]
+detects: [deployer_controls_price_and_settlement, oracle_setter_price_push]
+protects: [operator_bond_covers_abuse]
+anchors: []
+thresholds:
+  min_conflicted_notional_usd:
+    value: 100000.0
+    unit: usd
+    basis: placeholder
+    note: Ignores dust; any material position by a price setter is a conflict.
+condition: market.oracle_setter_position_usd >= threshold.min_conflicted_notional_usd
+report:
+  oracle_setter_position_usd: market.oracle_setter_position_usd
+false_positives:
+  - scenario: The deployer's market-making or hedging account is also a sub-deployer.
+    distinguisher: Ask whether the role separation can be enforced on chain (separate keys); hedging does not need setOracle authority.
+limitations:
+  - Positions held through other, unlinked addresses are invisible. Silence is weak evidence of no conflict.
+fixtures:
+  - name: price setter long fires
+    expect: fires
+    provenance: synthetic
+    surface: hip3_perps
+    values: {market.oracle_setter_position_usd: 2.5e6}
+  - name: no position is silent
+    expect: silent
+    provenance: synthetic
+    surface: hip3_perps
+    values: {market.oracle_setter_position_usd: 0.0}
+  - name: unresolved setters is unknown
+    expect: unknown
+    provenance: synthetic
+    surface: hip3_perps
+    values: {}

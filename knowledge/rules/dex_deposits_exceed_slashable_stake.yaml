@@ -1,0 +1,47 @@
+id: dex_deposits_exceed_slashable_stake
+title: A HIP-3 dex holds far more user money than its deployer can be slashed
+summary: >-
+  A HIP-3 deployer's honesty is secured by its slashable stake (at least
+  500,000 HYPE). If users deposit many times that amount, abusing price or
+  settlement powers can pay more than slashing costs. The ratio is a ceiling on
+  economic security, not a prediction of abuse.
+stage: precondition
+mode: report
+severity: medium
+consumer: Users choosing a dex; validators; deployers raising their own bond
+action: Treat the dex's price feed as trusted, not trustless; size exposure accordingly.
+applies_to: [hip3_perps]
+scope: [dex]
+detects: [deployer_controls_price_and_settlement]
+protects: [operator_bond_covers_abuse]
+anchors: []
+thresholds:
+  max_deposit_to_stake:
+    value: 10.0
+    unit: ratio
+    basis: placeholder
+condition: dex.total_net_deposit_usd / dex.slashable_stake_usd >= threshold.max_deposit_to_stake
+report:
+  deposit_to_stake: dex.total_net_deposit_usd / dex.slashable_stake_usd
+false_positives:
+  - scenario: The deployer has reputational or legal exposure far larger than its stake (a regulated firm).
+    distinguisher: Off-chain accountability is real but unenforceable by the protocol; record it alongside the ratio.
+limitations:
+  - The stake is the documented minimum; a deployer may have staked more.
+  - Extractable value is usually below total deposits; deposits are an upper bound on loss.
+fixtures:
+  - name: billion-dollar dex on minimum stake fires
+    expect: fires
+    provenance: synthetic
+    surface: hip3_perps
+    values: {dex.total_net_deposit_usd: 1.0e9, dex.slashable_stake_usd: 20.0e6}
+  - name: small dex is silent
+    expect: silent
+    provenance: synthetic
+    surface: hip3_perps
+    values: {dex.total_net_deposit_usd: 50.0e6, dex.slashable_stake_usd: 20.0e6}
+  - name: no price for the stake is unknown
+    expect: unknown
+    provenance: synthetic
+    surface: hip3_perps
+    values: {dex.total_net_deposit_usd: 1.0e9}

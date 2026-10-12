@@ -1,0 +1,63 @@
+id: linked_accounts_opposite_positions
+title: Commonly funded accounts hold large opposite positions in a thin market
+summary: >-
+  An actor holding both sides across its own accounts has no market risk, so a
+  large balanced cluster in a thin market suggests one leg is meant to be
+  liquidated onto the backstop (JELLY - a $4.1M short against $2.15M and $1.9M
+  longs, all funded by one actor).
+stage: precondition
+mode: report
+severity: high
+consumer: Risk analysts; protocol risk team
+action: Watch the cluster's legs for margin withdrawal and the external price sources for pumps.
+applies_to: [core_perps, hyperps, hip3_perps]
+scope: [cluster, market]
+detects: [self_opposed_positions]
+protects: [loss_containment]
+anchors: [hl-2025-03-jelly]
+thresholds:
+  max_same_direction_share:
+    value: 0.7
+    unit: ratio
+    basis: placeholder
+    note: 0.5 is perfectly balanced; JELLY was about 0.5 (4.1M short vs 4.05M long).
+  min_wallets:
+    value: 2.0
+    unit: count
+    basis: placeholder
+  max_cluster_to_depth:
+    value: 1.0
+    unit: ratio
+    basis: placeholder
+condition:
+  all:
+    - cluster.shared_funding_source
+    - cluster.wallet_count >= threshold.min_wallets
+    - cluster.same_direction_share <= threshold.max_same_direction_share
+    - cluster.combined_notional_usd / min(market.bid_depth_usd_2pct, market.ask_depth_usd_2pct) >= threshold.max_cluster_to_depth
+report:
+  same_direction_share: cluster.same_direction_share
+  cluster_to_thinner_side_depth: cluster.combined_notional_usd / min(market.bid_depth_usd_2pct, market.ask_depth_usd_2pct)
+false_positives:
+  - scenario: A market maker hedging inventory across sub-accounts.
+    distinguisher: Market makers quote both sides continuously; self-opposed attackers open once and wait.
+  - scenario: Funding-rate arbitrage between sub-accounts with different margin modes.
+    distinguisher: Positions are small relative to depth and persist without margin changes.
+limitations:
+  - Sub-account and vault transfers make linkage easy for Hyperliquid accounts but invisible across exchanges.
+fixtures:
+  - name: balanced cluster larger than depth fires
+    expect: fires
+    provenance: synthetic
+    surface: core_perps
+    values: {cluster.shared_funding_source: true, cluster.wallet_count: 3.0, cluster.same_direction_share: 0.5, cluster.combined_notional_usd: 8.15e6, market.bid_depth_usd_2pct: 0.5e6, market.ask_depth_usd_2pct: 0.8e6}
+  - name: one-sided cluster is silent here
+    expect: silent
+    provenance: synthetic
+    surface: core_perps
+    values: {cluster.shared_funding_source: true, cluster.wallet_count: 3.0, cluster.same_direction_share: 1.0, cluster.combined_notional_usd: 8.15e6, market.bid_depth_usd_2pct: 0.5e6, market.ask_depth_usd_2pct: 0.8e6}
+  - name: unknown funding link is unknown
+    expect: unknown
+    provenance: synthetic
+    surface: core_perps
+    values: {cluster.wallet_count: 3.0, cluster.same_direction_share: 0.5, cluster.combined_notional_usd: 8.15e6, market.bid_depth_usd_2pct: 0.5e6, market.ask_depth_usd_2pct: 0.8e6}

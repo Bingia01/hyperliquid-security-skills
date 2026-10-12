@@ -1,0 +1,53 @@
+id: privileged_role_exceeds_function
+title: A privileged role has powers its function does not need, or one key controls user funds
+summary: >-
+  Any single excess power over user assets, code or arbitrary calls is enough
+  for total loss when the role's key is lost or its holder defects, so this
+  rule fires on one excess capability, not a count of them. It also fires when
+  a single key can move user funds, whatever the role's purpose.
+stage: pre_deployment
+mode: report
+severity: critical
+consumer: HyperEVM developers; auditors; users evaluating a protocol
+action: >-
+  Remove the excess power or split it into a separate role behind a timelocked
+  multisig; put fund-moving powers behind withdrawal limits and delays.
+applies_to: [hyperevm_apps]
+scope: [role]
+detects: [overbroad_privileged_role, custodial_operator_control]
+protects: [delegated_scope, custody_conservation, operator_bond_covers_abuse]
+anchors: [hl-2025-09-hypervault, hl-2026-04-purrlend]
+condition:
+  any:
+    - role.can_move_user_assets and not role.function_requires_moving_assets
+    - role.can_upgrade and not role.function_requires_upgrade
+    - role.can_call_arbitrary_targets and not role.function_requires_arbitrary_calls
+    - role.can_move_user_assets and role.signer == 'single_key'
+report:
+  signer: role.signer
+false_positives:
+  - scenario: A documented emergency role with fund-recovery power behind a long timelock.
+    distinguisher: Timelock length versus users' ability to exit within it.
+limitations:
+  - The 'function requires' features are judgments about intent and must be argued from documentation.
+fixtures:
+  - name: position manager that can move funds fires
+    expect: fires
+    provenance: synthetic
+    surface: hyperevm_apps
+    values: {role.can_move_user_assets: true, role.function_requires_moving_assets: false, role.can_upgrade: false, role.function_requires_upgrade: false, role.can_call_arbitrary_targets: false, role.function_requires_arbitrary_calls: false, role.signer: timelocked_multisig}
+  - name: one key over user funds fires even when the power is intended
+    expect: fires
+    provenance: synthetic
+    surface: hyperevm_apps
+    values: {role.can_move_user_assets: true, role.function_requires_moving_assets: true, role.can_upgrade: false, role.function_requires_upgrade: false, role.can_call_arbitrary_targets: false, role.function_requires_arbitrary_calls: false, role.signer: single_key}
+  - name: minimal role behind a multisig is silent
+    expect: silent
+    provenance: synthetic
+    surface: hyperevm_apps
+    values: {role.can_move_user_assets: false, role.function_requires_moving_assets: false, role.can_upgrade: false, role.function_requires_upgrade: false, role.can_call_arbitrary_targets: false, role.function_requires_arbitrary_calls: false, role.signer: multisig}
+  - name: unreviewed intent is unknown
+    expect: unknown
+    provenance: synthetic
+    surface: hyperevm_apps
+    values: {role.can_move_user_assets: true, role.can_upgrade: false, role.can_call_arbitrary_targets: false, role.signer: multisig}

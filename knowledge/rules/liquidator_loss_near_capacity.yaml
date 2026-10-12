@@ -1,0 +1,52 @@
+id: liquidator_loss_near_capacity
+title: Liquidator vault losses approach its capacity
+summary: >-
+  Since the March 2025 changes the HLP liquidator vaults hold limited capital,
+  and losses beyond their capacity trigger auto-deleveraging of profitable
+  traders. Unrealized loss as a share of liquidator equity measures how close
+  that is.
+stage: active_attack
+mode: report
+severity: high
+consumer: Traders with large profitable positions (auto-deleveraging risk); risk analysts
+action: >-
+  Expect auto-deleveraging risk on the opposite side of the backstop's
+  positions; reduce exposure ranked highest for auto-deleveraging.
+applies_to: [core_perps, hyperps]
+scope: [backstop]
+detects: [backstop_inherits_unexitable_position]
+protects: [loss_containment]
+anchors: [hl-2025-03-jelly]
+thresholds:
+  max_unrealized_loss_share:
+    value: 0.5
+    unit: ratio
+    basis: placeholder
+    note: The auto-deleveraging trigger threshold is not published; 0.5 flags halfway to total loss of liquidator equity.
+condition: >-
+  -backstop.liquidator_unrealized_pnl_usd / backstop.liquidator_account_value_usd
+  >= threshold.max_unrealized_loss_share
+report:
+  unrealized_loss_share: -backstop.liquidator_unrealized_pnl_usd / backstop.liquidator_account_value_usd
+false_positives:
+  - scenario: A large but hedged inheritance shows a temporary mark-to-market loss.
+    distinguisher: Check whether the loss narrows as the position unwinds.
+limitations:
+  - JELLY predates the liquidator cap; it anchors the mechanism, not this exact measure.
+  - Account value already includes unrealized PnL, so the share rises sharply near total loss.
+fixtures:
+  - name: deep drawdown fires
+    expect: fires
+    provenance: synthetic
+    surface: core_perps
+    values: {backstop.liquidator_unrealized_pnl_usd: -20.0e6, backstop.liquidator_account_value_usd: 12.0e6}
+  - name: gains are silent
+    expect: silent
+    provenance: synthetic
+    surface: core_perps
+    values: {backstop.liquidator_unrealized_pnl_usd: 1.0e6, backstop.liquidator_account_value_usd: 32.0e6}
+  - name: missing equity is unknown
+    expect: unknown
+    provenance: synthetic
+    surface: core_perps
+    values: {backstop.liquidator_unrealized_pnl_usd: -20.0e6}

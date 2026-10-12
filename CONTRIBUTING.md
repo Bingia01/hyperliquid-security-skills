@@ -1,14 +1,24 @@
 # Contributing
 
-Contributions are welcome, especially:
-- stronger primary sources,
-- better incident reconstruction,
-- clearer primitive definitions,
-- sharper false-positive notes,
-- improvements to evidence hygiene.
+Most valuable contributions, in order:
 
-## Rules
-1. Every new incident must include a machine-readable record under `data/incidents/`.
-2. Every new case study must declare its evidence tier: `confirmed`, `credible_report`, or `research_lead`.
-3. Research leads may be documented, but they must not be used to justify strong detection rules without stronger evidence.
-4. Keep the open-source boundary intact. Do not add closed-source simulation or proprietary execution logic here.
+1. **Primary sources** for existing incidents (official statements,
+   postmortems, explorer links) - they raise derived tiers.
+2. **Citation checks** - read every source of an incident against its claims
+   and set `citations_checked: true`.
+3. **Calibration data** - distributions of rule ratios across markets from
+   archived data, with the method stated, replacing `placeholder` thresholds.
+4. **Reconstructed fixtures** - incident numbers (depth, positions) with
+   cited claims, so rules can be shown to fire on real cases.
+5. New incidents, rules and features.
+
+## Requirements for every change
+
+- `hyperliquid-security validate` reports no errors.
+- `pytest`, `ruff check`, `ruff format --check` and `mypy` pass.
+- `hyperliquid-security report` has been run; generated files are committed.
+- New features state an honest `source.type`; `public_api` features name the
+  request type and field and have been checked against the live API.
+- No source is cited unread; no URL is written that was not fetched or seen
+  verbatim.
+- Nothing that places orders, signs transactions or exploits a system.

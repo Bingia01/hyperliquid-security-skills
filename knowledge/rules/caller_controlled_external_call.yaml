@@ -1,0 +1,59 @@
+id: caller_controlled_external_call
+title: A contract that holds or spends user assets makes calls the caller controls
+summary: >-
+  If a caller chooses the target or the calldata of a call that the contract
+  makes with its own authority, the caller acts with that authority - over the
+  contract's balances and every allowance or operator right users granted it.
+  An allowlist of targets does not help when the calldata is free and an
+  allowlisted target holds user positions (Hyperdrive, 2025-09).
+stage: pre_deployment
+mode: report
+severity: critical
+consumer: HyperEVM developers before deployment; auditors
+action: >-
+  Remove generic execute paths, or restrict them to fixed targets with an
+  allowlist of function selectors and validated arguments, and assert balance
+  deltas after the call.
+applies_to: [hyperevm_apps]
+scope: [contract]
+detects: [unbounded_external_call, arbitrary_call_injection]
+protects: [delegated_scope, custody_conservation]
+anchors: [hl-2025-09-hyperdrive]
+condition:
+  all:
+    - contract.holds_or_spends_user_assets
+    - any:
+        - contract.call_target_control == 'caller_supplied'
+        - contract.call_data_control == 'caller_supplied'
+report:
+  entrypoint_access: contract.call_entrypoint_access
+  post_call_balance_check: contract.post_call_balance_check
+false_positives:
+  - scenario: Multicall helpers that only ever act on the caller's own assets and hold no allowances.
+    distinguisher: The contract holds nothing and is approved for nothing between transactions.
+limitations:
+  - Static features summarize the most permissive call path; review every call site.
+  - Fires regardless of who may call; a privileged caller narrows exposure to that role's key.
+fixtures:
+  - name: Hyperdrive router as reported
+    expect: fires
+    provenance: reconstructed
+    incident: hl-2025-09-hyperdrive
+    surface: hyperevm_apps
+    values: {contract.holds_or_spends_user_assets: true, contract.call_target_control: allowlisted, contract.call_data_control: caller_supplied}
+    evidence: {contract.holds_or_spends_user_assets: router_operator, contract.call_target_control: router_arbitrary_call, contract.call_data_control: router_arbitrary_call}
+  - name: fixed target and internal calldata is silent
+    expect: silent
+    provenance: synthetic
+    surface: hyperevm_apps
+    values: {contract.holds_or_spends_user_assets: true, contract.call_target_control: constant, contract.call_data_control: internal}
+  - name: caller-controlled call on a contract with no assets or allowances is silent
+    expect: silent
+    provenance: synthetic
+    surface: hyperevm_apps
+    values: {contract.holds_or_spends_user_assets: false, contract.call_target_control: caller_supplied, contract.call_data_control: caller_supplied}
+  - name: unreviewed calldata path is unknown
+    expect: unknown
+    provenance: synthetic
+    surface: hyperevm_apps
+    values: {contract.holds_or_spends_user_assets: true, contract.call_target_control: constant}

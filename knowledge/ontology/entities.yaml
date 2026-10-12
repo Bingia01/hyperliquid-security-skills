@@ -1,0 +1,21 @@
+# The kinds of things features describe. A feature's id is "<entity>.<name>".
+# A rule lists the entities it may read in its `scope`; reading anything else
+# is a compile error, which stops a rule from silently dividing a vault-wide
+# total by one market's depth.
+
+- id: market
+  description: One perpetual market (core, hyperp or HIP-3 asset).
+- id: backstop
+  description: The liquidation backstop as a whole (HLP liquidator vaults or a HIP-3 dex liquidator).
+- id: dex
+  description: One HIP-3 deployer dex.
+- id: account
+  description: One user account, with the market of the position under evaluation.
+- id: cluster
+  description: A set of accounts believed to be controlled by one actor.
+- id: order
+  description: One resting order, from placement to removal.
+- id: contract
+  description: One HyperEVM contract under review.
+- id: role
+  description: One privileged role in a HyperEVM contract system.

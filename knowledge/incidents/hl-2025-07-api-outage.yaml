@@ -1,0 +1,40 @@
+id: hl-2025-07-api-outage
+title: API outage during a traffic spike delays orders for 37 minutes
+period: {start: 2025-07-29, end: 2025-07-29}
+summary: >-
+  From 14:10 to 14:47 UTC a traffic spike degraded Hyperliquid's API; orders
+  were delayed and some executed orders returned errors. About $2M was refunded
+  automatically to affected users. On-chain state was not affected.
+control_owner: infrastructure_operator
+mechanisms: [operational_failure]
+code_defect: undetermined
+surfaces: [core_perps]
+losses:
+  - bearer: Traders unable to act (refunded)
+    amount_usd_low: 1.99e6
+    amount_usd_high: 2.0e6
+    basis: realized
+    claims: [refund]
+sources:
+  - {id: theblock, title: Hyperliquid refunds users after outage, publisher: The Block, url: "https://www.theblock.co/post/364861/hyperliquid-outage-refund", tier: news, published: 2025-07-29}
+  - {id: cointelegraph, title: Hyperliquid reimburses $2M to traders after outage, publisher: Cointelegraph, url: "https://cointelegraph.com/news/hyperliquid-reimburses-2m-crypto-traders-outage", tier: news}
+claims:
+  - id: outage
+    statement: A traffic spike degraded the API from about 14:10 to 14:47 UTC; orders were delayed and some executed orders returned errors.
+    sources: [theblock, cointelegraph]
+    core: true
+  - id: refund
+    statement: About $2M was refunded automatically to affected users.
+    sources: [theblock, cointelegraph]
+movie:
+  - phase: trigger
+    description: API traffic spike.
+    claims: [outage]
+  - phase: loss
+    description: Users cannot cancel or close on time.
+    claims: [outage]
+  - phase: response
+    description: Automatic refunds.
+    claims: [refund]
+primitives: [api_capacity_exhaustion]
+invariants_violated: [exit_availability]

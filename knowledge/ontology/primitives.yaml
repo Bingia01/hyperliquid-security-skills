@@ -1,0 +1,241 @@
+# Reusable building blocks of incidents.
+#
+# kind: attacker_action  - something an adversary does (detect it while it happens)
+# kind: system_weakness  - a condition that makes an action profitable (measure it
+#                          continuously; it exists before any attack)
+#
+# Keeping the two apart matters for detection: weaknesses support precondition
+# monitoring with long lead time; actions support in-progress detection with
+# short lead time and higher false-positive cost.
+
+# --- Market and risk-engine: attacker actions --------------------------------
+
+- id: external_price_push
+  name: External price push
+  kind: attacker_action
+  description: >-
+    Buying or selling on outside venues whose prices feed the oracle, so the
+    oracle moves without trading against Hyperliquid's own book.
+  threatens: [price_integrity]
+
+- id: book_price_push
+  name: Book price push
+  kind: attacker_action
+  description: >-
+    Trading through a thin Hyperliquid order book to move mid, last trade and
+    therefore part of the mark price.
+  threatens: [price_integrity]
+
+- id: self_opposed_positions
+  name: Self-opposed positions
+  kind: attacker_action
+  description: >-
+    Opening opposite positions across accounts one actor controls so that the
+    losing leg can be pushed into liquidation and onto the backstop while the
+    winning leg keeps the gain.
+  threatens: [loss_containment]
+
+- id: collateral_withdrawal_toward_liquidation
+  name: Collateral withdrawal toward liquidation
+  kind: attacker_action
+  description: >-
+    Removing margin from a large position so its liquidation price sits next to
+    mark, making liquidation the exit route.
+  threatens: [liquidation_not_cheaper_exit]
+
+- id: spoof_wall
+  name: Spoof wall
+  kind: attacker_action
+  description: >-
+    Placing a large visible order to influence other traders, then removing it
+    before it can be filled.
+  threatens: [price_integrity]
+
+- id: capital_sharding
+  name: Capital sharding
+  kind: attacker_action
+  description: >-
+    Splitting capital across many freshly funded wallets so that per-account
+    limits and concentration checks do not see one actor.
+  threatens: [loss_containment, price_integrity]
+
+- id: oracle_setter_price_push
+  name: Oracle-setter price push
+  kind: attacker_action
+  description: >-
+    A party that publishes a market's oracle or mark inputs moves them to
+    benefit its own positions, possibly followed by halting the market to
+    settle at the moved price.
+  threatens: [operator_bond_covers_abuse, price_integrity]
+
+# --- Market and risk-engine: system weaknesses --------------------------------
+
+- id: exposure_exceeds_depth
+  name: Exposure exceeds depth
+  kind: system_weakness
+  description: >-
+    Open interest or single positions are large relative to executable depth,
+    so forced closes cannot clear on the book.
+  threatens: [loss_containment]
+
+- id: backstop_inherits_unexitable_position
+  name: Backstop inherits an unexitable position
+  kind: system_weakness
+  description: >-
+    The liquidation backstop takes over positions larger than the book can
+    absorb, converting a trader's insolvency into a loss for the backstop or,
+    beyond its cap, for auto-deleveraged traders.
+  threatens: [loss_containment]
+
+- id: thin_external_price_source
+  name: Thin external price source
+  kind: system_weakness
+  description: >-
+    The oracle draws on venues where moving the price is cheap relative to the
+    open interest marked to it.
+  threatens: [price_integrity]
+
+- id: liquidation_cheaper_than_market_exit
+  name: Liquidation cheaper than market exit
+  kind: system_weakness
+  description: >-
+    Margin and withdrawal rules let a trader reach liquidation with a position
+    whose market exit would cost more than the liquidation does.
+  threatens: [liquidation_not_cheaper_exit]
+
+- id: discretionary_crisis_settlement
+  name: Discretionary crisis settlement
+  kind: system_weakness
+  description: >-
+    Under stress the settlement price or delisting decision is chosen case by
+    case rather than by a precommitted rule.
+  threatens: [rule_stability]
+
+- id: liquidity_withdrawal_under_stress
+  name: Liquidity withdrawal under stress
+  kind: system_weakness
+  description: >-
+    Market makers pull quotes during fast moves, so the depth that risk limits
+    assumed is not there when liquidations need it.
+  threatens: [loss_containment]
+
+- id: deployer_controls_price_and_settlement
+  name: Deployer controls price and settlement
+  kind: system_weakness
+  description: >-
+    One party publishes the oracle or mark inputs and can halt or settle the
+    market, so its honesty, not a market price, determines outcomes.
+  threatens: [operator_bond_covers_abuse]
+
+# --- Accounts -----------------------------------------------------------------
+
+- id: stolen_key_sweep
+  name: Stolen-key sweep
+  kind: attacker_action
+  description: >-
+    Using stolen signing authority to move an account's assets out, typically
+    quickly and to fresh destinations, then bridging or mixing them.
+  threatens: [signing_authority]
+
+- id: single_key_custody
+  name: Single-key custody
+  kind: system_weakness
+  description: >-
+    Large balances controlled by one hot key with no withdrawal delay, limit
+    or second signer.
+  threatens: [signing_authority]
+
+# --- HyperEVM applications ----------------------------------------------------
+
+- id: arbitrary_call_injection
+  name: Arbitrary call injection
+  kind: attacker_action
+  description: >-
+    Supplying the call target or calldata that a contract then executes with
+    its own authority (its balances and the allowances users granted it).
+  threatens: [delegated_scope, custody_conservation]
+
+- id: operator_fund_extraction
+  name: Operator fund extraction
+  kind: attacker_action
+  description: >-
+    A privileged operator moves custodied user funds outside the application's
+    published rules.
+  threatens: [custody_conservation]
+
+- id: unbounded_external_call
+  name: Unbounded external call
+  kind: system_weakness
+  description: >-
+    A contract exposes an entry point whose call target or calldata is chosen
+    by the caller, without an allowlist that bounds what the call can do.
+  threatens: [delegated_scope]
+
+- id: missing_post_call_check
+  name: Missing post-call check
+  kind: system_weakness
+  description: >-
+    No balance or state assertion after an external call, so an unexpected
+    effect of the call goes unnoticed.
+  threatens: [custody_conservation]
+
+- id: overbroad_privileged_role
+  name: Overbroad privileged role
+  kind: system_weakness
+  description: >-
+    A role can move user funds, upgrade code or make arbitrary calls when its
+    function does not require it.
+  threatens: [delegated_scope, custody_conservation]
+
+- id: custodial_operator_control
+  name: Custodial operator control
+  kind: system_weakness
+  description: >-
+    User deposits are controlled by operator keys with no on-chain constraint
+    (timelock, withdrawal limit, independent signer) on where they can go.
+  threatens: [custody_conservation, operator_bond_covers_abuse]
+
+- id: reentrant_state_update
+  name: Reentrant state update
+  kind: system_weakness
+  description: >-
+    An external call happens before the contract records the effects it relies
+    on, including callbacks from token transfers.
+  threatens: [custody_conservation]
+
+- id: unprotected_initializer
+  name: Unprotected initializer
+  kind: system_weakness
+  description: >-
+    A proxy or implementation can be initialized by anyone, handing them the
+    roles the initializer assigns.
+  threatens: [delegated_scope]
+
+- id: assumed_synchronous_core_action
+  name: Assumed synchronous HyperCore action
+  kind: system_weakness
+  description: >-
+    A contract treats a CoreWriter action (order, transfer, vault move) as done
+    inside the same transaction, although HyperCore executes it after the EVM
+    block, sometimes after a deliberate delay, and a failure does not revert
+    the EVM transaction.
+  threatens: [cross_domain_consistency]
+
+- id: core_evm_unit_mismatch
+  name: HyperCore/EVM unit mismatch
+  kind: system_weakness
+  description: >-
+    A contract converts between HyperCore amounts or prices and EVM amounts
+    with the wrong decimals (weiDecimals, evm extra wei decimals, precompile
+    price scaling).
+  threatens: [cross_domain_consistency, custody_conservation]
+
+# --- Infrastructure -----------------------------------------------------------
+
+- id: api_capacity_exhaustion
+  name: API capacity exhaustion
+  kind: system_weakness
+  description: >-
+    Off-chain request handling saturates, so users cannot cancel, close or
+    withdraw while markets move.
+  threatens: [exit_availability]

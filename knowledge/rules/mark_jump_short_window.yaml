@@ -1,0 +1,55 @@
+id: mark_jump_short_window
+title: Mark price jumps within minutes
+summary: >-
+  A large mark move within five minutes liquidates leveraged positions before
+  anyone can react. When one input (a single print, one venue) drives it, the
+  liquidations are caused by the price feed rather than the market. The
+  xyz:SKHYNIX event moved mark 18.7% almost instantly from one pre-market print.
+stage: active_attack
+mode: alert
+severity: high
+consumer: HIP-3 deployers (oracle owners); traders; risk analysts
+action: >-
+  Check whether the move is confirmed by independent venues. If it rests on one
+  source or one print, a deployer should correct inputs or halt before further
+  liquidations.
+applies_to: [core_perps, hip3_perps]
+scope: [market]
+detects: [thin_external_price_source, book_price_push]
+protects: [price_integrity]
+anchors: [hl-2026-07-skhynix-oracle]
+thresholds:
+  max_mark_move_bps_5m:
+    value: 1000.0
+    unit: bps
+    basis: placeholder
+    note: 10% in five minutes. Crypto majors crossed this on 2025-10-10; profiles should raise or lower it per asset class after calibration.
+condition: market.mark_move_bps_5m >= threshold.max_mark_move_bps_5m
+report:
+  mark_move_bps_5m: market.mark_move_bps_5m
+false_positives:
+  - scenario: Genuine market-wide crash or news shock (2025-10-10).
+    distinguisher: Independent venues and correlated assets moved by a similar amount.
+  - scenario: Market open after a weekend or holiday for HIP-3 equities.
+    distinguisher: The move matches the primary exchange's opening auction, not a single print.
+limitations:
+  - Needs recorded mark history; the public API has no mark history endpoint.
+fixtures:
+  - name: xyz:SKHYNIX mark fall
+    expect: fires
+    provenance: reconstructed
+    incident: hl-2026-07-skhynix-oracle
+    surface: hip3_perps
+    values: {market.mark_move_bps_5m: 1790.0}
+    evidence: {market.mark_move_bps_5m: mark_fall}
+    note: Galaxy reports an 18.7% mark fall, Nexus Mutual 17.9% peak to trough, both within seconds; the smaller figure is used. Any five-minute window containing the fall moved at least that much.
+  - name: ordinary volatility is silent
+    expect: silent
+    provenance: synthetic
+    surface: core_perps
+    values: {market.mark_move_bps_5m: 120.0}
+  - name: no earlier snapshot means unknown
+    expect: unknown
+    provenance: synthetic
+    surface: hip3_perps
+    values: {}

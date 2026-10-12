@@ -1,0 +1,9 @@
+id: hyperps
+surface: hyperps
+description: >-
+  Pre-launch perps priced against their own mark history. With no external
+  anchor, a book push moves the oracle too, so exposure limits are tighter.
+  Placeholder values.
+overrides:
+  open_interest_exceeds_depth:
+    max_oi_to_depth: 20.0

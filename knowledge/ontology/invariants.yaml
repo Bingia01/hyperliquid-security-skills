@@ -1,0 +1,96 @@
+# Safety properties the ecosystem must preserve.
+#
+# Each invariant is stated so that a violation is observable: you can point at
+# an event and say "this broke it". An analyst rule (such as "do not mistake an
+# app failure for a protocol failure") is a rule about classification, not a
+# property of the system, so it does not belong here.
+
+- id: loss_containment
+  name: Loss containment
+  statement: >-
+    Losses beyond an account's collateral are absorbed by designated backstops,
+    within their stated capacity and in a published order, before any loss is
+    shared with other users.
+  rationale: >-
+    A leveraged venue is solvent only if forced closes clear. When a backstop
+    inherits positions it cannot exit, losses escape to its depositors and, on
+    Hyperliquid after March 2025, to profitable traders through
+    auto-deleveraging.
+
+- id: price_integrity
+  name: Price integrity
+  statement: >-
+    Prices used for margin, liquidation and settlement cannot be moved at a
+    cost lower than the value that moving them extracts.
+  rationale: >-
+    Manipulation resistance is an economic inequality, not a property of any
+    particular oracle design. A price is safe when moving it costs more than
+    the positions marked to it can pay out.
+
+- id: liquidation_not_cheaper_exit
+  name: Liquidation is never the cheaper exit
+  statement: >-
+    No account can obtain better execution by being liquidated than by closing
+    its position voluntarily on the book.
+  rationale: >-
+    If liquidation is cheaper, a large trader can hand its slippage to the
+    backstop on purpose. Margin withdrawal rules exist to keep this inequality.
+
+- id: rule_stability
+  name: Rule stability under stress
+  statement: >-
+    Outcomes under stress follow rules published before the stress began, and
+    any discretionary intervention follows precommitted criteria.
+  rationale: >-
+    Ad hoc settlement changes who wins and loses after positions are taken,
+    and once traders expect rescue they price it in.
+
+- id: signing_authority
+  name: Signing authority
+  statement: >-
+    Only the account holder, or a delegate acting within the scope the holder
+    granted, can move the account's assets.
+  rationale: >-
+    Every other control assumes the signer is the owner.
+
+- id: delegated_scope
+  name: Least privilege for delegated execution
+  statement: >-
+    Contracts, operators and routers can perform only the actions their
+    function requires.
+  rationale: >-
+    Excess authority converts a single defect or key loss into total loss.
+
+- id: custody_conservation
+  name: Custody conservation
+  statement: >-
+    An application's obligations to users never exceed its assets, and its
+    assets move only under the application's published rules.
+  rationale: >-
+    Reentrancy, accounting errors and exit scams all break this one equation.
+
+- id: exit_availability
+  name: Exit availability
+  statement: >-
+    Users can cancel orders, reduce positions and withdraw when markets move.
+  rationale: >-
+    Risk controls that depend on user action fail when users cannot act.
+
+- id: cross_domain_consistency
+  name: Cross-domain consistency
+  statement: >-
+    An application's record of HyperCore state (balances, positions, completed
+    actions) matches HyperCore once asynchronous actions settle.
+  rationale: >-
+    CoreWriter actions execute after the EVM block, some with a deliberate
+    delay, and a failed HyperCore action does not revert the EVM transaction.
+
+- id: operator_bond_covers_abuse
+  name: Operator bond covers abuse
+  statement: >-
+    Any party with power over prices, settlement or user funds stands to lose
+    more by abusing that power than abuse can extract.
+  rationale: >-
+    Some powers must exist (a HIP-3 deployer must publish an oracle price). The
+    only protection then is that abuse costs more than it pays, for example
+    through slashable stake.

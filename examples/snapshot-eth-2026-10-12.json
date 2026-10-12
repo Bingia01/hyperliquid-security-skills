@@ -1,0 +1,31 @@
+{
+  "surface": "core_perps",
+  "subject": "ETH",
+  "observed_at": "2026-10-12T16:08:01.555292+00:00",
+  "source": "https://api.hyperliquid.xyz/info",
+  "values": {
+    "backstop.liquidator_account_value_usd": 32999998.574898,
+    "backstop.liquidator_unrealized_pnl_usd": 0.0,
+    "market.ask_depth_usd_2pct": 90590365.752,
+    "market.backstop_long_usd": 0.0,
+    "market.backstop_short_usd": 0.0,
+    "market.bid_depth_usd_2pct": 99386917.57,
+    "market.mark_price": 2533.3,
+    "market.open_interest_usd": 2799291164.363541,
+    "market.oracle_price": 2534.4
+  },
+  "provenance": {
+    "backstop.liquidator_account_value_usd": "sum over 4 HLP liquidator vaults",
+    "backstop.liquidator_unrealized_pnl_usd": "sum over 4 HLP liquidator vaults",
+    "market.ask_depth_usd_2pct": "l2Book nSigFigs=3; mid 2533.35; band +/-2%",
+    "market.backstop_long_usd": "sum over 4 HLP liquidator vaults",
+    "market.backstop_short_usd": "sum over 4 HLP liquidator vaults",
+    "market.bid_depth_usd_2pct": "l2Book nSigFigs=3; mid 2533.35; band +/-2%",
+    "market.mark_move_bps_5m": "absent: no earlier snapshot supplied (--previous)",
+    "market.mark_price": "metaAndAssetCtxs markPx",
+    "market.oi_cap_usd": "absent: applies to HIP-3 markets only",
+    "market.open_interest_usd": "metaAndAssetCtxs openInterest (coin units) x markPx",
+    "market.oracle_price": "metaAndAssetCtxs oraclePx",
+    "market.oracle_setter_position_usd": "absent: applies to HIP-3 markets only"
+  }
+}

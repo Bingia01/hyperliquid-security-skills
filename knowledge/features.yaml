@@ -1,0 +1,387 @@
+# The data dictionary. Rules may only read features declared here.
+#
+# source.type says how a value can be obtained TODAY:
+#   public_api           - Hyperliquid info API (POST https://api.hyperliquid.xyz/info)
+#   node_data            - needs a non-validating node's outputs or its S3 archives
+#   external_market_data - other venues
+#   static_analysis      - read from contract source or bytecode
+#   analyst              - judgment (intent, documentation); never automatic
+#   derived_history      - needs earlier snapshots of public data
+#
+# Facts relied on below were checked against the live API on 2026-10-12:
+#   * l2Book returns at most 20 levels per side; at full precision ETH's 20 bid
+#     levels spanned 0.075% of price, so depth within 2% needs coarser
+#     aggregation (nSigFigs) or it is silently undercounted.
+#   * openInterest in asset contexts is in coin units, not USD.
+#   * HLP (0xdfc24b077bc1425ad1dea75bcb6f8158e10df303) is a parent vault; its
+#     children include "HLP Liquidator", "HLP Liquidator 2/3/4" and strategy
+#     vaults. Inventory lives in the children, not the parent.
+#   * There is no endpoint that lists all accounts or positions in a market.
+
+# --- market -------------------------------------------------------------------
+
+- id: market.open_interest_usd
+  kind: number
+  unit: usd
+  description: Open interest (one side) valued at mark.
+  source:
+    type: public_api
+    detail: metaAndAssetCtxs (with "dex" for HIP-3) -> openInterest (coin units) x markPx.
+
+- id: market.mark_price
+  kind: number
+  unit: usd
+  description: Mark price used for margin, liquidations and unrealized PnL.
+  source:
+    type: public_api
+    detail: metaAndAssetCtxs -> markPx. (allMids returns mid, which is not mark.)
+
+- id: market.oracle_price
+  kind: number
+  unit: usd
+  description: >-
+    Oracle price used for funding. Core perps - validators' stake-weighted
+    median of weighted external spot medians. Hyperps - an EMA of the market's
+    own mark. HIP-3 - published by the deployer or its oracle updater.
+  source:
+    type: public_api
+    detail: metaAndAssetCtxs -> oraclePx.
+
+- id: market.bid_depth_usd_2pct
+  kind: number
+  unit: usd
+  description: >-
+    Resting bid notional within 2% below mid; the liquidity a long liquidation
+    sells into. Absent (unknown) when the 20-level window cannot cover the band.
+  source:
+    type: public_api
+    detail: >-
+      l2Book, retried with nSigFigs 5, 4, 3, 2 until the returned levels reach
+      past the band or the side has fewer than 20 levels; sum px x sz within
+      the band. Bucketed levels make the band edge accurate to one bucket.
+
+- id: market.ask_depth_usd_2pct
+  kind: number
+  unit: usd
+  description: Resting ask notional within 2% above mid; the liquidity a short liquidation buys from.
+  source:
+    type: public_api
+    detail: Same method as market.bid_depth_usd_2pct on the ask side.
+
+- id: market.oi_cap_usd
+  kind: number
+  unit: usd
+  description: Notional open interest cap set by a HIP-3 deployer for this asset.
+  source:
+    type: public_api
+    detail: perpDexs -> assetToStreamingOiCap (identical to perpDexLimits coinToOiCap where both exist).
+
+- id: market.backstop_long_usd
+  kind: number
+  unit: usd
+  description: Long notional held by the market's liquidation backstop.
+  source:
+    type: public_api
+    detail: >-
+      Core perps - sum of long positionValue across HLP child vaults whose name
+      starts with "HLP Liquidator" (clearinghouseState per vault). HIP-3 - the
+      dex's backstop liquidator account (0x4000...0000 + dex index), queried
+      with "dex". Unknown if no liquidator vault is found.
+
+- id: market.backstop_short_usd
+  kind: number
+  unit: usd
+  description: Short notional held by the market's liquidation backstop.
+  source:
+    type: public_api
+    detail: As market.backstop_long_usd, for short positions.
+
+- id: market.oracle_setter_position_usd
+  kind: number
+  unit: usd
+  description: >-
+    Absolute position notional in this market held by addresses that can set
+    its oracle or mark - the deployer, its oracleUpdater, and sub-deployers
+    granted setOracle.
+  source:
+    type: public_api
+    detail: >-
+      perpDexs -> deployer, oracleUpdater, subDeployers["setOracle"]; then
+      clearinghouseState(user, dex) for each. Positions held through other,
+      unlinked addresses are invisible to this measure.
+
+- id: market.mark_move_bps_5m
+  kind: number
+  unit: bps
+  description: Absolute change in mark price versus a snapshot taken 4 to 6 minutes earlier.
+  source:
+    type: derived_history
+    detail: >-
+      Two metaAndAssetCtxs snapshots (markPx). Candles are trade prices, not
+      mark, so mark history must be recorded; there is no mark history endpoint.
+
+# --- backstop -----------------------------------------------------------------
+
+- id: backstop.liquidator_account_value_usd
+  kind: number
+  unit: usd
+  description: Combined account value of the HLP liquidator vaults.
+  source:
+    type: public_api
+    detail: Sum of marginSummary.accountValue over HLP child vaults named "HLP Liquidator*".
+
+- id: backstop.liquidator_unrealized_pnl_usd
+  kind: number
+  unit: usd
+  description: Combined unrealized PnL of positions held by the HLP liquidator vaults.
+  source:
+    type: public_api
+    detail: Sum of assetPositions[].position.unrealizedPnl over the same vaults.
+
+# --- dex (HIP-3) --------------------------------------------------------------
+
+- id: dex.total_net_deposit_usd
+  kind: number
+  unit: usd
+  description: Net USD deposited into a HIP-3 dex; an upper bound on what users there can lose.
+  source:
+    type: public_api
+    detail: perpDexStatus(dex) -> totalNetDeposit.
+
+- id: dex.slashable_stake_usd
+  kind: number
+  unit: usd
+  description: >-
+    Lower bound on the deployer's slashable stake - the documented minimum of
+    500,000 HYPE valued at the HYPE spot price. A deployer may stake more.
+  source:
+    type: public_api
+    detail: 500000 x HYPE/USDC spot mid (allMids, with the pair name resolved through spotMeta).
+
+# --- account ------------------------------------------------------------------
+
+- id: account.position_notional_usd
+  kind: number
+  unit: usd
+  description: Absolute notional of the account's position in the market under evaluation.
+  source:
+    type: public_api
+    detail: clearinghouseState(user) -> assetPositions[].position.positionValue. Finding which accounts to watch needs node data or trade feeds (recentTrades lists both users).
+
+- id: account.position_side
+  kind: string
+  values: [long, short]
+  description: Side of the account's position in the market under evaluation.
+  source:
+    type: public_api
+    detail: clearinghouseState(user) -> sign of assetPositions[].position.szi.
+
+- id: account.liquidation_distance_bps
+  kind: number
+  unit: bps
+  description: Distance from mark to the position's liquidation price.
+  source:
+    type: public_api
+    detail: abs(markPx - liquidationPx) / markPx x 10000 from clearinghouseState and asset contexts.
+
+- id: account.outflow_share_1h
+  kind: number
+  unit: ratio
+  description: Value sent out of the account in the last hour divided by account value an hour ago.
+  source:
+    type: public_api
+    detail: userNonFundingLedgerUpdates (withdraw, send, spotTransfer, subAccountTransfer out) over one hour; account value from portfolio history.
+
+- id: account.new_destination_outflow_share_1h
+  kind: number
+  unit: ratio
+  description: Share of the last hour's outflow sent to destinations this account never sent to before.
+  source:
+    type: public_api
+    detail: userNonFundingLedgerUpdates over the account's full history (paginated by time).
+
+# --- cluster ------------------------------------------------------------------
+
+- id: cluster.wallet_count
+  kind: number
+  unit: count
+  description: Number of accounts in the cluster.
+  source:
+    type: node_data
+    detail: Accounts discovered from node fills; linked by funding (below).
+
+- id: cluster.shared_funding_source
+  kind: bool
+  description: Whether the accounts were funded from a common address or exchange withdrawal batch within a short window.
+  source:
+    type: node_data
+    detail: Ledger updates of each account (public per account) after discovery through node fills; exchange-funded clusters need off-chain attribution.
+
+- id: cluster.same_direction_share
+  kind: number
+  unit: ratio
+  description: Share of the cluster's notional on the cluster's dominant side in the evaluated market.
+  source:
+    type: node_data
+    detail: Positions of each cluster account (clearinghouseState).
+
+- id: cluster.combined_notional_usd
+  kind: number
+  unit: usd
+  description: Combined position notional of the cluster in the evaluated market.
+  source:
+    type: node_data
+    detail: Sum of positionValue across cluster accounts.
+
+# --- order --------------------------------------------------------------------
+
+- id: order.notional_usd
+  kind: number
+  unit: usd
+  description: Notional of one resting order at placement.
+  source:
+    type: node_data
+    detail: Order statuses written by a node (--write-order-statuses); l2Book aggregates orders and cannot show this.
+
+- id: order.same_side_depth_usd_2pct
+  kind: number
+  unit: usd
+  description: Resting depth within 2% of mid on the order's side, excluding the order, at placement.
+  source:
+    type: node_data
+    detail: Order-level book reconstruction from raw book diffs (--write-raw-book-diffs).
+
+- id: order.lifetime_seconds
+  kind: number
+  unit: seconds
+  description: Time from placement to removal.
+  source:
+    type: node_data
+    detail: Order statuses (placed -> canceled/filled timestamps).
+
+- id: order.removal
+  kind: string
+  values: [canceled, filled, expired]
+  description: How the order left the book. A wall that fills is liquidity, not a spoof.
+  source:
+    type: node_data
+    detail: Final order status.
+
+- id: order.adverse_move_bps_60s
+  kind: number
+  unit: bps
+  description: >-
+    Price move in the 60 seconds after removal, against the side the order
+    advertised (a fall after a bid wall is pulled, a rise after an ask wall).
+  source:
+    type: node_data
+    detail: Mark or mid series around the removal timestamp.
+
+# --- contract (HyperEVM) ------------------------------------------------------
+
+- id: contract.call_target_control
+  kind: string
+  values: [no_external_call, constant, allowlisted, caller_supplied]
+  description: Who chooses the target of the contract's most permissive external call.
+  source:
+    type: static_analysis
+    detail: Data flow from function parameters to call/delegatecall targets.
+
+- id: contract.call_data_control
+  kind: string
+  values: [no_external_call, internal, selector_allowlisted, caller_supplied]
+  description: Who chooses the calldata of that external call.
+  source:
+    type: static_analysis
+    detail: Data flow from bytes parameters to call data.
+
+- id: contract.call_entrypoint_access
+  kind: string
+  values: [anyone, privileged_role]
+  description: Who may invoke the entry point that makes that call.
+  source:
+    type: static_analysis
+    detail: Modifiers and require statements on the entry point.
+
+- id: contract.holds_or_spends_user_assets
+  kind: bool
+  description: Whether the contract holds user assets or can spend allowances users granted it.
+  source:
+    type: static_analysis
+    detail: Token balances, transferFrom usage and approval flows.
+
+- id: contract.post_call_balance_check
+  kind: bool
+  description: Whether the contract asserts balance or state deltas after that external call.
+  source:
+    type: static_analysis
+    detail: Balance reads and require statements following the call.
+
+- id: contract.uses_core_writer
+  kind: bool
+  description: Whether the contract sends actions to HyperCore through CoreWriter (0x3333333333333333333333333333333333333333).
+  source:
+    type: static_analysis
+    detail: Calls to sendRawAction on the CoreWriter address.
+
+- id: contract.accounting_assumes_core_success
+  kind: bool
+  description: >-
+    Whether the contract records the effect of a CoreWriter action (funds
+    moved, order filled) in the same transaction, without later reconciliation
+    against HyperCore state.
+  source:
+    type: analyst
+    detail: Read the code paths after each sendRawAction call; requires judgment about later reconciliation.
+
+# --- role (HyperEVM) ----------------------------------------------------------
+
+- id: role.can_move_user_assets
+  kind: bool
+  description: Whether the role can transfer user tokens or change user balances.
+  source:
+    type: static_analysis
+    detail: Functions gated by the role that transfer tokens or write balance mappings.
+
+- id: role.can_upgrade
+  kind: bool
+  description: Whether the role can change contract code or implementation.
+  source:
+    type: static_analysis
+    detail: upgradeTo / proxy admin / selfdestruct-style powers gated by the role.
+
+- id: role.can_call_arbitrary_targets
+  kind: bool
+  description: Whether the role can make the contract call an address and calldata of its choosing.
+  source:
+    type: static_analysis
+    detail: Role-gated functions forwarding caller-chosen target and data.
+
+- id: role.function_requires_moving_assets
+  kind: bool
+  description: Whether the role's documented purpose needs it to move user assets.
+  source:
+    type: analyst
+    detail: Compare the role's stated purpose with its powers.
+
+- id: role.function_requires_upgrade
+  kind: bool
+  description: Whether the role's documented purpose needs upgrade power.
+  source:
+    type: analyst
+    detail: Compare the role's stated purpose with its powers.
+
+- id: role.function_requires_arbitrary_calls
+  kind: bool
+  description: Whether the role's documented purpose needs arbitrary external calls.
+  source:
+    type: analyst
+    detail: Compare the role's stated purpose with its powers.
+
+- id: role.signer
+  kind: string
+  values: [single_key, multisig, timelocked_multisig, governance]
+  description: What controls the role.
+  source:
+    type: static_analysis
+    detail: Role holder address resolved on chain (code or EOA; multisig threshold; timelock delay).

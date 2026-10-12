@@ -1,0 +1,37 @@
+{
+  "surface": "hip3_perps",
+  "subject": "xyz:SKHX",
+  "observed_at": "2026-10-12T16:09:27.509370+00:00",
+  "source": "https://api.hyperliquid.xyz/info",
+  "values": {
+    "backstop.liquidator_account_value_usd": 103775.216029,
+    "backstop.liquidator_unrealized_pnl_usd": 0,
+    "dex.slashable_stake_usd": 42303250.0,
+    "dex.total_net_deposit_usd": 999883412.212039,
+    "market.ask_depth_usd_2pct": 7099682.9399999995,
+    "market.backstop_long_usd": 0.0,
+    "market.backstop_short_usd": 0.0,
+    "market.bid_depth_usd_2pct": 6924924.03,
+    "market.mark_price": 1170.6,
+    "market.oi_cap_usd": 1000000000.0,
+    "market.open_interest_usd": 269254809.81600046,
+    "market.oracle_price": 1166.5,
+    "market.oracle_setter_position_usd": 0.0
+  },
+  "provenance": {
+    "backstop.liquidator_account_value_usd": "dex backstop liquidator 0x4000000000000000000000000000000000000001",
+    "backstop.liquidator_unrealized_pnl_usd": "dex backstop liquidator 0x4000000000000000000000000000000000000001",
+    "dex.slashable_stake_usd": "documented minimum 500,000 HYPE x spot 84.6065 (lower bound)",
+    "dex.total_net_deposit_usd": "perpDexStatus",
+    "market.ask_depth_usd_2pct": "l2Book nSigFigs=3; mid 1170.35; band +/-2%",
+    "market.backstop_long_usd": "dex backstop liquidator 0x4000000000000000000000000000000000000001",
+    "market.backstop_short_usd": "dex backstop liquidator 0x4000000000000000000000000000000000000001",
+    "market.bid_depth_usd_2pct": "l2Book nSigFigs=3; mid 1170.35; band +/-2%",
+    "market.mark_move_bps_5m": "absent: no earlier snapshot supplied (--previous)",
+    "market.mark_price": "metaAndAssetCtxs markPx",
+    "market.oi_cap_usd": "perpDexs assetToStreamingOiCap",
+    "market.open_interest_usd": "metaAndAssetCtxs openInterest (coin units) x markPx",
+    "market.oracle_price": "metaAndAssetCtxs oraclePx",
+    "market.oracle_setter_position_usd": "2 addresses (deployer, oracleUpdater, setOracle sub-deployers)"
+  }
+}
