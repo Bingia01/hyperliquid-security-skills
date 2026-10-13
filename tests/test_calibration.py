@@ -227,3 +227,45 @@ def test_calibrated_basis_requires_a_result_id() -> None:
         Threshold(value=1.0, unit="ratio", basis=ThresholdBasis.calibrated)
     with pytest.raises(ValueError, match="names its calibration"):
         Threshold(value=1.0, unit="ratio", basis=ThresholdBasis.placeholder, calibration="x")
+
+
+def _tardis_book(
+    path: Path, snapshots: list[tuple[int, list[tuple[float, float]], list[tuple[float, float]]]]
+) -> None:
+    header = ["exchange", "symbol", "timestamp", "local_timestamp"]
+    for i in range(25):
+        header += [f"asks[{i}].price", f"asks[{i}].amount", f"bids[{i}].price", f"bids[{i}].amount"]
+    lines = [",".join(header)]
+    for ts, bids, asks in snapshots:
+        cells = ["hyperliquid", "X", str(ts), str(ts)]
+        for i in range(25):
+            ask = asks[i] if i < len(asks) else ("", "")
+            bid = bids[i] if i < len(bids) else ("", "")
+            cells += [str(ask[0]), str(ask[1]), str(bid[0]), str(bid[1])]
+        lines.append(",".join(cells))
+    path.write_text("\n".join(lines) + "\n")
+
+
+def test_archive_upper_bounds(repo_kb: KnowledgeBase, tmp_path: Path) -> None:
+    from hyperliquid_security.calibration import archive_upper_bounds
+
+    minute = 60_000_000
+    _tardis_book(
+        tmp_path / "book.csv",
+        [
+            # All levels inside 2%: thinner side 99.5*1 + 99.0*1 = 198.5 -> bound 1000/198.5.
+            (minute, [(99.5, 1.0), (99.0, 1.0)], [(100.5, 2.0), (101.0, 2.0)]),
+            # A bid level beyond 2%: the sum is no lower bound of in-band depth; skipped.
+            (2 * minute, [(99.5, 1.0), (97.0, 1.0)], [(100.5, 2.0)]),
+        ],
+    )
+    (tmp_path / "ticker.csv").write_text(
+        "exchange,symbol,timestamp,local_timestamp,funding_timestamp,funding_rate,"
+        "predicted_funding_rate,open_interest,last_price,index_price,mark_price\n"
+        f"hyperliquid,X,{minute + 5},{minute + 5},,0,,10,,100,100\n"
+        f"hyperliquid,X,{2 * minute + 5},{2 * minute + 5},,0,,10,,100,100\n"
+    )
+    bound = archive_upper_bounds(repo_kb, tmp_path / "book.csv", tmp_path / "ticker.csv")
+    assert bound["snapshots"] == 2
+    assert bound["bounded_snapshots"] == 1
+    assert bound["upper_bound_median"] == round(1000 / 198.5, 1)

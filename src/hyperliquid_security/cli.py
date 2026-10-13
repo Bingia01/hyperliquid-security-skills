@@ -164,7 +164,12 @@ def command_calibrate(args: argparse.Namespace) -> int:
     computed = dt.date.fromisoformat(args.computed) if args.computed else dt.date.today()
     results = []
     if args.passes:
-        results += calibrate_cross_sections(kb, load_passes(Path(args.passes)), computed)
+        archive = (
+            json.loads(Path(args.archive_checks).read_text(encoding="utf-8"))
+            if args.archive_checks
+            else None
+        )
+        results += calibrate_cross_sections(kb, load_passes(Path(args.passes)), computed, archive)
     if args.candles:
         anchors = (
             json.loads(Path(args.anchors).read_text(encoding="utf-8")) if args.anchors else None
@@ -233,6 +238,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--passes", help="JSON lines from `record`")
     p.add_argument("--candles", help="JSON from `record --candles`")
     p.add_argument("--anchors", help="JSON {name: {surface, basis, moves_bps}} to check")
+    p.add_argument(
+        "--archive-checks",
+        help="JSON {name: {surface, source, book, ticker}}: archived 20-level books to bound",
+    )
     p.add_argument("--computed", help="date to stamp on results (default today)")
     p.set_defaults(func=command_calibrate)
     return parser

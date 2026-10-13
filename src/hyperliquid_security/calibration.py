@@ -26,7 +26,9 @@ the values agree.
 from __future__ import annotations
 
 import bisect
+import csv
 import datetime as dt
+import gzip
 import json
 import math
 import statistics
@@ -140,9 +142,15 @@ def report_value(compiled: CompiledRule, name: str, values: Mapping[str, Any]) -
     return float(result)
 
 
+def _open_text(path: Path) -> Any:
+    if path.suffix == ".gz":
+        return gzip.open(path, "rt", encoding="utf-8")
+    return path.open(encoding="utf-8")
+
+
 def load_passes(path: Path) -> list[dict[str, Any]]:
     rows = []
-    with path.open(encoding="utf-8") as handle:
+    with _open_text(path) as handle:
         for line in handle:
             row = json.loads(line)
             if "coin" in row:
@@ -228,8 +236,13 @@ def alert_budget(
     }
 
 
+def load_json(path: Path) -> Any:
+    with _open_text(path) as handle:
+        return json.load(handle)
+
+
 def load_candle_moves(path: Path, surface: str) -> tuple[dict[str, list[float]], float]:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = load_json(path)
     markets = {
         coin: entry["moves_bps"]
         for coin, entry in data["markets"].items()
@@ -242,6 +255,73 @@ def load_candle_moves(path: Path, surface: str) -> tuple[dict[str, list[float]],
 
 def utc(ms: float) -> str:
     return dt.datetime.fromtimestamp(ms / 1000, dt.UTC).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _levels(row: Mapping[str, str], side: str) -> list[tuple[float, float]]:
+    return [
+        (float(row[f"{side}[{i}].price"]), float(row[f"{side}[{i}].amount"]))
+        for i in range(25)
+        if row.get(f"{side}[{i}].price")
+    ]
+
+
+def archive_upper_bounds(
+    kb: KnowledgeBase, book_csv: Path, ticker_csv: Path, band: float = 0.02
+) -> dict[str, Any]:
+    """Upper bounds on open interest / thinner side's 2% depth from a 20-level archive.
+
+    Archived books (Tardis ``book_snapshot_25`` of Hyperliquid's 20-level feed)
+    cannot measure depth within the band when the 20 levels end inside it.
+    When every level lies within the band, their notional sum is a *lower*
+    bound on in-band depth, so the rule's ratio computed from it is an *upper*
+    bound. Snapshots whose levels extend past the band are skipped (their sum
+    is no bound). Open interest is the same minute's value from the ticker
+    file (``open_interest`` in coins x ``mark_price``).
+    """
+    compiled = compile_rule(kb.rules["open_interest_exceeds_depth"], kb.features)
+    oi_by_minute: dict[int, float] = {}
+    with _open_text(ticker_csv) as handle:
+        for row in csv.DictReader(handle):
+            if row["open_interest"] and row["mark_price"]:
+                minute = int(row["timestamp"]) // 60_000_000
+                oi_by_minute[minute] = float(row["open_interest"]) * float(row["mark_price"])
+    bounds: list[float] = []
+    spans: list[float] = []
+    snapshots = 0
+    with _open_text(book_csv) as handle:
+        for row in csv.DictReader(handle):
+            bids, asks = _levels(row, "bids"), _levels(row, "asks")
+            if not bids or not asks:
+                continue
+            snapshots += 1
+            mid = (bids[0][0] + asks[0][0]) / 2
+            if bids[-1][0] < mid * (1 - band) or asks[-1][0] > mid * (1 + band):
+                continue
+            spans.append(max(mid - bids[-1][0], asks[-1][0] - mid) / mid)
+            minute = int(row["timestamp"]) // 60_000_000
+            if minute not in oi_by_minute:
+                continue
+            value = report_value(
+                compiled,
+                "oi_to_thinner_side_depth",
+                {
+                    "market.open_interest_usd": oi_by_minute[minute],
+                    "market.bid_depth_usd_2pct": sum(p * q for p, q in bids),
+                    "market.ask_depth_usd_2pct": sum(p * q for p, q in asks),
+                },
+            )
+            if value is not None and math.isfinite(value):
+                bounds.append(value)
+    if not bounds:
+        raise ValueError(f"{book_csv}: no snapshot yields a bound")
+    return {
+        "snapshots": snapshots,
+        "bounded_snapshots": len(bounds),
+        "median_level_span_pct": round(statistics.median(spans) * 100, 2),
+        "median_open_interest_usd": round(statistics.median(oi_by_minute.values()), 0),
+        "upper_bound_median": round(statistics.median(bounds), 1),
+        "upper_bound_p90": round(quantile(bounds, 0.9), 1),
+    }
 
 
 # --------------------------------------------------------------------------
@@ -259,7 +339,10 @@ def _window(rows: list[dict[str, Any]]) -> str:
 
 
 def calibrate_cross_sections(
-    kb: KnowledgeBase, rows: list[dict[str, Any]], computed: dt.date
+    kb: KnowledgeBase,
+    rows: list[dict[str, Any]],
+    computed: dt.date,
+    archive_checks: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     window = _window(rows)
     depth_method = (
@@ -278,6 +361,27 @@ def calibrate_cross_sections(
         )
         for surface in ("core_perps", "hip3_perps")
     }
+    checks = []
+    for name, spec in (archive_checks or {}).items():
+        bound = archive_upper_bounds(kb, Path(spec["book"]), Path(spec["ticker"]))
+        threshold = oi[spec["surface"]]["value"]
+        verdict = (
+            "would not have fired (even the upper bound is below the threshold)"
+            if bound["upper_bound_median"] < threshold
+            else "inconclusive (the upper bound reaches the threshold; the true ratio is lower)"
+        )
+        checks.append(
+            {
+                "description": (
+                    f"{name}: {spec['source']}; 20 levels spanned a median "
+                    f"{bound['median_level_span_pct']}% of price, so 2% depth is only bounded; "
+                    f"open interest median ${bound['median_open_interest_usd']:,.0f}; ratio "
+                    f"upper bound median {bound['upper_bound_median']}, p90 "
+                    f"{bound['upper_bound_p90']} over {bound['bounded_snapshots']} snapshots"
+                ),
+                "outcome": f"{verdict}; {spec['surface']} threshold {threshold}",
+            }
+        )
     results.append(
         {
             "id": "open_interest_to_depth_cross_section",
@@ -314,6 +418,7 @@ def calibrate_cross_sections(
                     "value": oi["hip3_perps"]["value"],
                 },
             ],
+            "checks": checks,
             "results": oi,
         }
     )
@@ -364,7 +469,7 @@ def calibrate_mark_moves(
     for surface in ("core_perps", "hip3_perps"):
         moves, days = load_candle_moves(candles_path, surface)
         per_surface[surface] = alert_budget(moves, days, ALERT_EPISODES_PER_DAY)
-    data = json.loads(candles_path.read_text(encoding="utf-8"))
+    data = load_json(candles_path)
     firsts = [e["first"] for e in data["markets"].values()]
     lasts = [e["last"] for e in data["markets"].values()]
     span = f"{utc(min(firsts))} to {utc(max(lasts))}"
