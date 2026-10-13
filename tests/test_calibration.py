@@ -307,3 +307,68 @@ def test_committed_calibrations_reproduce_from_committed_data(repo_kb: Knowledge
     for result in fresh:
         committed = repo_kb.calibrations[result["id"]]
         assert [t.model_dump() for t in committed.targets] == result["targets"], result["id"]
+
+
+def pass_row(coin: str, minute: int, open_interest_usd: float, mark: float) -> dict[str, Any]:
+    return {
+        "observed_at": (
+            dt.datetime(2026, 10, 13, 6, 0, tzinfo=dt.UTC) + dt.timedelta(minutes=minute)
+        ).isoformat(),
+        "dex": None,
+        "coin": coin,
+        "surface": "core_perps",
+        "mark_price": mark,
+        "open_interest_usd": open_interest_usd,
+        "bid_depth_usd_2pct": 1.0e6,
+        "ask_depth_usd_2pct": 1.0e6,
+    }
+
+
+def test_growth_samples_count_positions_not_price() -> None:
+    from hyperliquid_security.calibration import open_interest_growth_samples
+
+    rows = [
+        pass_row("A", 0, 1.0e6, 1.0),
+        pass_row("A", 30, 1.5e6, 1.5),  # 30 minutes apart: outside the window
+        pass_row("A", 60, 2.0e6, 2.0),  # same coins, price doubled
+        pass_row("B", 0, 1.0e6, 1.0),
+        pass_row("B", 61, 3.0e6, 1.0),  # two million new coins
+    ]
+    samples = open_interest_growth_samples(rows, {"core": 33.0e6})
+    changes = {market: v["market.open_interest_change_usd_1h"] for _, market, v in samples}
+    assert changes == {"A": 0.0, "B": 2.0e6}
+    assert all(v["backstop.liquidator_account_value_usd"] == 33.0e6 for _, _, v in samples)
+
+
+def test_growth_rule_base_rate_matches_its_notes(repo_kb: KnowledgeBase) -> None:
+    """The base rate quoted in the rule's threshold note follows from committed data."""
+    from hyperliquid_security.calibration import (
+        base_rate,
+        load_passes,
+        open_interest_growth_samples,
+    )
+    from tests.conftest import KNOWLEDGE
+
+    data = KNOWLEDGE / "calibration" / "data"
+    rows = load_passes(data / "passes_2026-10-13.jsonl.gz")
+    capital = json.loads((data / "backstop_capital_2026-10-13.json").read_text())
+    rule_id = "open_interest_growth_exceeds_depth"
+    rates = base_rate(
+        repo_kb, rule_id, open_interest_growth_samples(rows, capital["account_value_usd"])
+    )
+    core, hip3 = rates["core_perps"], rates["hip3_perps"]
+    assert core["firing"] == ["GRASS", "PONS", "TIA"]
+    assert len(hip3["firing"]) == 5
+    assert core["unknown"] == hip3["unknown"] == 0
+
+    # An empty backstop makes the capital condition hold for any growth, leaving depth alone.
+    depth_only = base_rate(repo_kb, rule_id, open_interest_growth_samples(rows, {"core": 0.0}))[
+        "core_perps"
+    ]
+    assert len(depth_only["firing"]) == 6
+    assert "PURR" in depth_only["firing"]
+
+    note = repo_kb.rules[rule_id].thresholds["max_growth_to_depth"].note
+    assert f"3 of {core['markets']} validator-operated markets (GRASS, PONS, TIA)" in note
+    assert f"5 of {hip3['markets']} HIP-3 markets" in note
+    assert "6\nvalidator-operated" in note or "6 validator-operated" in note

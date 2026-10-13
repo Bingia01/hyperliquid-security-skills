@@ -118,9 +118,7 @@ def command_evaluate(args: argparse.Namespace) -> int:
 def command_snapshot(args: argparse.Namespace) -> int:
     from .hyperliquid_api import ApiError, InfoClient, build_market_snapshot
 
-    previous = None
-    if args.previous:
-        previous = json.loads(Path(args.previous).read_text(encoding="utf-8"))
+    previous = [json.loads(Path(path).read_text(encoding="utf-8")) for path in args.previous or []]
     client = InfoClient(base_url=args.api)
     try:
         snapshot = build_market_snapshot(
@@ -213,7 +211,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = commands.add_parser("snapshot", help="build a market snapshot from the live public API")
     p.add_argument("--coin", required=True, help="e.g. ETH, or xyz:NVDA with --dex xyz")
     p.add_argument("--dex", help="HIP-3 dex name")
-    p.add_argument("--previous", help="earlier snapshot file, for history-derived features")
+    p.add_argument(
+        "--previous",
+        action="append",
+        help="earlier snapshot file (repeatable): about 5 minutes old for the mark move, "
+        "about 1 hour old for open interest growth",
+    )
     p.add_argument(
         "--surface",
         help="override the surface (the API does not flag hyperps; pass --surface hyperps)",

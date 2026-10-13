@@ -8,7 +8,8 @@ Facts this module relies on (checked against the live API on 2026-10-12):
 
 * ``l2Book`` returns at most 20 levels per side; ``nSigFigs`` (2-5) coarsens
   price buckets so 20 levels span a wider band.
-* ``openInterest`` in asset contexts is in coin units.
+* ``openInterest`` in asset contexts is in coin units (rechecked 2026-10-13:
+  BTC 38,321 x mark 83,343 = $3.19B).
 * HLP's parent vault lists child vaults; liquidator children are named
   "HLP Liquidator", "HLP Liquidator 2", and so on.
 * HIP-3 dexes appear in ``perpDexs`` (index 0 is the validator-operated dex,
@@ -23,7 +24,7 @@ import json
 import time
 import urllib.error
 import urllib.request
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, Protocol
 
 HLP_PARENT = "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
@@ -32,7 +33,11 @@ HIP3_MINIMUM_STAKE_HYPE = 500_000.0
 DEPTH_BAND = 0.02
 BOOK_LEVEL_LIMIT = 20
 SIG_FIG_LADDER: tuple[int | None, ...] = (None, 5, 4, 3, 2)
-MARK_HISTORY_WINDOW_SECONDS = (240.0, 360.0)
+# Each history feature compares with an earlier snapshot whose age lies in its window.
+HISTORY_WINDOWS_SECONDS = {
+    "market.mark_move_bps_5m": (240.0, 360.0),
+    "market.open_interest_change_usd_1h": (3300.0, 3900.0),
+}
 
 Transport = Callable[[dict[str, Any]], Any]
 
@@ -230,10 +235,12 @@ def build_market_snapshot(
     client: InfoClient,
     coin: str,
     dex: str | None = None,
-    previous: dict[str, Any] | None = None,
+    previous: Sequence[dict[str, Any]] = (),
     surface: str | None = None,
     now: Callable[[], dt.datetime] = lambda: dt.datetime.now(dt.UTC),
 ) -> dict[str, Any]:
+    """Measure one market. ``previous`` holds earlier snapshots of any markets and
+    ages; each history feature uses the one of this market whose age fits its window."""
     snapshot = _Snapshot()
     observed_at = now()
     if surface is None:
@@ -242,15 +249,18 @@ def build_market_snapshot(
     found = _asset_context(client, coin, dex)
     context = found["context"]
     mark = _f(context["markPx"])
+    coins = _f(context["openInterest"])
     snapshot.put("market.mark_price", mark, "metaAndAssetCtxs markPx")
     snapshot.put("market.oracle_price", _f(context["oraclePx"]), "metaAndAssetCtxs oraclePx")
+    snapshot.put("market.open_interest_base_asset", coins, "metaAndAssetCtxs openInterest")
     snapshot.put(
         "market.open_interest_usd",
-        _f(context["openInterest"]) * mark,
+        coins * mark,
         "metaAndAssetCtxs openInterest (coin units) x markPx",
     )
     _guarded(snapshot, DEPTH_FEATURES, lambda: measure_depth(client, coin, snapshot))
     _mark_history(snapshot, coin, mark, observed_at, previous)
+    _open_interest_history(snapshot, coin, coins, mark, observed_at, previous)
 
     if dex:
         _guarded(snapshot, HIP3_FEATURES, lambda: _hip3_features(client, coin, dex, snapshot))
@@ -297,31 +307,78 @@ def _guarded(snapshot: _Snapshot, features: tuple[str, ...], step: Callable[[], 
                 snapshot.absent(feature, f"request failed: {exc}")
 
 
+def _earlier(
+    feature: str,
+    needs: str,
+    coin: str,
+    observed_at: dt.datetime,
+    previous: Sequence[dict[str, Any]],
+) -> tuple[float, float] | str:
+    """(earlier value of ``needs``, age in seconds) from the snapshot of this market
+    whose age lies in the feature's window, nearest the window's middle; otherwise
+    the reason there is none."""
+    low, high = HISTORY_WINDOWS_SECONDS[feature]
+    if not previous:
+        return "no earlier snapshot supplied (--previous)"
+    ages = []
+    candidates = []
+    for earlier in previous:
+        if earlier.get("subject") != coin:
+            continue
+        age = (observed_at - dt.datetime.fromisoformat(earlier["observed_at"])).total_seconds()
+        ages.append(age)
+        value = earlier.get("values", {}).get(needs)
+        if low <= age <= high and value is not None:
+            candidates.append((abs(age - (low + high) / 2), age, float(value)))
+    if candidates:
+        _, age, value = min(candidates)
+        return value, age
+    if not ages:
+        return "no earlier snapshot of this market"
+    seen = ", ".join(f"{age:.0f}s" for age in sorted(ages))
+    return f"need a snapshot {low:.0f}-{high:.0f}s old with {needs}; have {seen}"
+
+
 def _mark_history(
     snapshot: _Snapshot,
     coin: str,
     mark: float,
     observed_at: dt.datetime,
-    previous: dict[str, Any] | None,
+    previous: Sequence[dict[str, Any]],
 ) -> None:
     feature = "market.mark_move_bps_5m"
-    if previous is None:
-        snapshot.absent(feature, "no earlier snapshot supplied (--previous)")
+    found = _earlier(feature, "market.mark_price", coin, observed_at, previous)
+    if isinstance(found, str):
+        snapshot.absent(feature, found)
         return
-    if previous.get("subject") != coin:
-        snapshot.absent(feature, "earlier snapshot is for a different market")
-        return
-    earlier = previous.get("values", {}).get("market.mark_price")
-    when = dt.datetime.fromisoformat(previous["observed_at"])
-    age = (observed_at - when).total_seconds()
-    low, high = MARK_HISTORY_WINDOW_SECONDS
-    if earlier is None or not low <= age <= high:
-        snapshot.absent(feature, f"earlier snapshot is {age:.0f}s old; need {low:.0f}-{high:.0f}s")
-        return
+    earlier, age = found
     if earlier == 0:
         snapshot.absent(feature, "earlier mark price was zero")
         return
     snapshot.put(feature, abs(mark - earlier) / earlier * 10_000, f"vs snapshot {age:.0f}s earlier")
+
+
+def _open_interest_history(
+    snapshot: _Snapshot,
+    coin: str,
+    coins: float,
+    mark: float,
+    observed_at: dt.datetime,
+    previous: Sequence[dict[str, Any]],
+) -> None:
+    """New open interest in coin units, valued at the current mark, so that a price move
+    alone does not count as growth."""
+    feature = "market.open_interest_change_usd_1h"
+    found = _earlier(feature, "market.open_interest_base_asset", coin, observed_at, previous)
+    if isinstance(found, str):
+        snapshot.absent(feature, found)
+        return
+    earlier, age = found
+    snapshot.put(
+        feature,
+        (coins - earlier) * mark,
+        f"(openInterest now - {age:.0f}s earlier) x markPx now",
+    )
 
 
 def _core_backstop_features(client: InfoClient, coin: str, snapshot: _Snapshot) -> None:

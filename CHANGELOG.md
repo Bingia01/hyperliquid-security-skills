@@ -1,5 +1,21 @@
 # Changelog
 
+## v3.2.0
+
+- **Open-interest growth rule** `open_interest_growth_exceeds_depth`: the last
+  hour's new open interest against the thinner side's 2% depth (definitional
+  1.0) and against the backstop's capital (placeholder 1%). Report mode,
+  uncalibrated; its base rate on the committed recording is stated in the rule
+  and pinned by a test.
+- Features `market.open_interest_base_asset` (public API) and
+  `market.open_interest_change_usd_1h` (history: asset units, valued at the
+  current mark, so a price move is not growth).
+- `snapshot --previous` is repeatable; each history feature uses the earlier
+  snapshot of the same market whose age fits its window, and says why when
+  none does.
+- `calibration.base_rate` evaluates a rule as written on recorded samples;
+  backstop capital measured on 2026-10-13 is committed for it.
+
 ## v3.1.0
 
 - **Calibrated thresholds.** `open_interest_exceeds_depth` (validator-operated
