@@ -10,17 +10,23 @@ def rule(kb: KnowledgeBase, rule_id: str, **changes: object) -> Rule:
 
 
 def test_profile_overrides_threshold(repo_kb: KnowledgeBase) -> None:
-    compiled = compile_rule(repo_kb.rules["open_interest_exceeds_depth"], repo_kb.features)
+    rule = repo_kb.rules["open_interest_exceeds_depth"]
+    default_value = rule.thresholds["max_oi_to_depth"].value
+    profile = repo_kb.profiles["hip3_perps"]
+    profile_value = profile.overrides[rule.id]["max_oi_to_depth"]
+    assert profile_value < default_value  # the HIP-3 profile is stricter
+    between = (default_value + profile_value) / 2
+    compiled = compile_rule(rule, repo_kb.features)
     values = {
-        "market.open_interest_usd": 30.0e6,
+        "market.open_interest_usd": between * 1.0e6,
         "market.bid_depth_usd_2pct": 1.0e6,
         "market.ask_depth_usd_2pct": 1.0e6,
     }
     default = evaluate_rule(compiled, values, "hip3_perps")
-    tuned = evaluate_rule(compiled, values, "hip3_perps", repo_kb.profiles["hip3_perps"])
-    assert default.outcome is Outcome.silent  # 30 < 50
-    assert tuned.outcome is Outcome.fires  # 30 >= 20 under the HIP-3 profile
-    assert tuned.thresholds == {"max_oi_to_depth": 20.0}
+    tuned = evaluate_rule(compiled, values, "hip3_perps", profile)
+    assert default.outcome is Outcome.silent  # below the rule's default
+    assert tuned.outcome is Outcome.fires  # above the HIP-3 override
+    assert tuned.thresholds == {"max_oi_to_depth": profile_value}
     assert tuned.profile == "hip3_perps"
 
 

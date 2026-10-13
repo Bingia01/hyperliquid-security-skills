@@ -1,6 +1,7 @@
 import copy
 import datetime as dt
 import json
+import math
 import statistics
 from pathlib import Path
 from typing import Any
@@ -43,6 +44,8 @@ def test_quantile_matches_inclusive_definition() -> None:
     ]
     with pytest.raises(ValueError):
         quantile([], 0.5)
+    assert quantile([1.0, math.inf, math.inf], 0.9) == math.inf
+    assert quantile([1.0, 2.0, math.inf], 0.5) == 2.0
 
 
 @given(series_strategy, st.integers(min_value=0, max_value=21).map(float))
@@ -152,12 +155,22 @@ def test_cross_sectional_uses_the_rules_own_ratio(repo_kb: KnowledgeBase) -> Non
             "ask_depth_usd_2pct": 1.0,
         }
     )
+    # No depth inside the band: an infinite ratio ranks as the most exposed market.
+    rows.append(
+        {
+            "coin": "F",
+            "surface": "core_perps",
+            "open_interest_usd": 5.0,
+            "bid_depth_usd_2pct": 0.0,
+            "ask_depth_usd_2pct": 0.0,
+        }
+    )
     result = cross_sectional(
         repo_kb, "open_interest_exceeds_depth", "oi_to_thinner_side_depth", rows, "core_perps", 0.5
     )
-    assert result["markets"] == 4  # E had no measurable depth
-    assert result["value"] == 25.0
-    assert [m["market"] for m in result["above_threshold"]] == ["D", "C"]
+    assert result["markets"] == 5  # E had no measurable depth; F is infinitely thin
+    assert result["value"] == 30.0
+    assert [m["market"] for m in result["above_threshold"]] == ["F", "D", "C"]
 
 
 def test_mark_move_calibration_checks_anchors(tmp_path: Path) -> None:
@@ -198,6 +211,7 @@ def _with_calibration(kb: KnowledgeBase, value_in_rule: float, value_in_result: 
         rule.id: rule.model_copy(update={"thresholds": {"max_cap_to_depth": threshold}}),
     }
     mutated.calibrations = {
+        **kb.calibrations,
         "test_cal": CalibrationResult(
             id="test_cal",
             computed=dt.date(2026, 10, 13),
@@ -212,14 +226,18 @@ def _with_calibration(kb: KnowledgeBase, value_in_rule: float, value_in_result: 
                     "value": value_in_result,
                 }
             ],
-        )
+        ),
     }
     return [p.message for p in validate(mutated) if p.level == "error"]
 
 
 def test_calibrated_threshold_must_match_its_result(repo_kb: KnowledgeBase) -> None:
-    assert not [e for e in _with_calibration(repo_kb, 144.0, 144.0) if "calibration" in e]
-    assert any("computed 150.0" in e for e in _with_calibration(repo_kb, 144.0, 150.0))
+    # Only the test calibration's own consistency matters here; the real result for
+    # this rule now has a target the mutated rule no longer cites.
+    assert not [e for e in _with_calibration(repo_kb, 144.0, 144.0) if "test_cal" in e]
+    assert any(
+        "computed 150.0" in e and "test_cal" in e for e in _with_calibration(repo_kb, 144.0, 150.0)
+    )
 
 
 def test_calibrated_basis_requires_a_result_id() -> None:
@@ -269,3 +287,23 @@ def test_archive_upper_bounds(repo_kb: KnowledgeBase, tmp_path: Path) -> None:
     assert bound["snapshots"] == 2
     assert bound["bounded_snapshots"] == 1
     assert bound["upper_bound_median"] == round(1000 / 198.5, 1)
+
+
+def test_committed_calibrations_reproduce_from_committed_data(repo_kb: KnowledgeBase) -> None:
+    """Every committed calibrated value follows from the committed recordings.
+
+    Changing a rule's report expression, or the data, without recalibrating
+    fails here. (Archive checks need third-party files and are not re-run.)
+    """
+    from hyperliquid_security.calibration import calibrate_cross_sections, load_passes
+    from tests.conftest import KNOWLEDGE
+
+    data = KNOWLEDGE / "calibration" / "data"
+    computed = dt.date(2026, 10, 13)
+    fresh = calibrate_cross_sections(
+        repo_kb, load_passes(data / "passes_2026-10-13.jsonl.gz"), computed
+    )
+    fresh.append(calibrate_mark_moves(data / "candles_5m_2026-10-13.json.gz", computed))
+    for result in fresh:
+        committed = repo_kb.calibrations[result["id"]]
+        assert [t.model_dump() for t in committed.targets] == result["targets"], result["id"]

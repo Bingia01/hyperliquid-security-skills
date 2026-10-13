@@ -17,23 +17,26 @@ markets, HyperEVM applications and user accounts.
 Read [docs/DESIGN.md](docs/DESIGN.md) for the reasoning, assumptions and
 constraints, and for what changed from v1/v2 and why.
 
-## Status at v3.0.0, stated plainly
+## Status at v3.1.0, stated plainly
 
 Live numbers are in the generated reports; these describe the release.
 
 - 14 incidents (derived tiers: 2 confirmed, 8 credible reports, 4 research leads).
   Claim-to-source mappings were verified line by line for JELLY and
   xyz:SKHYNIX; the rest come from a research pass and are marked unchecked.
-- 16 rules. All thresholds are **placeholders**; none has been calibrated on
-  historical data. Two rules have fixtures reconstructed from real incidents;
-  the rest are validated on synthetic fixtures, which test logic only.
+- 16 rules. Five threshold values are calibrated on recorded market data to
+  stated targets (see [calibration.md](docs/generated/calibration.md)); four
+  are definitional; the rest are placeholders and say so. Two rules have
+  fixtures reconstructed from real incidents; the rest are validated on
+  synthetic fixtures, which test logic only.
 - Exactly one rule (`mark_jump_short_window`) meets the bar for paging a human.
 - Rules needing positions of all accounts, order lifetimes or wallet clusters
   need node data; on public data they return `unknown`.
 
 See [docs/generated/rules.md](docs/generated/rules.md),
-[incidents.md](docs/generated/incidents.md) and
-[coverage.md](docs/generated/coverage.md) - all computed from the data.
+[incidents.md](docs/generated/incidents.md),
+[coverage.md](docs/generated/coverage.md) and
+[calibration.md](docs/generated/calibration.md) - all computed from the data.
 
 ## Quick start
 

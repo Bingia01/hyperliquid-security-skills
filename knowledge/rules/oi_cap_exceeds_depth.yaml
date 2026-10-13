@@ -16,10 +16,13 @@ protects: [loss_containment]
 anchors: []
 thresholds:
   max_cap_to_depth:
-    value: 100.0
+    value: 558.64
     unit: ratio
-    basis: placeholder
-    note: Same caveat as open_interest_exceeds_depth; caps are upper bounds, so the ratio is looser.
+    basis: calibrated
+    calibration: oi_cap_to_depth_cross_section
+    note: >-
+      90th percentile across HIP-3 markets of each market's median cap-to-depth
+      ratio (2026-10-13 recording): the most generously capped tenth.
 condition: >-
   market.oi_cap_usd / min(market.bid_depth_usd_2pct, market.ask_depth_usd_2pct)
   >= threshold.max_cap_to_depth
@@ -36,7 +39,7 @@ fixtures:
     expect: fires
     provenance: synthetic
     surface: hip3_perps
-    values: {market.oi_cap_usd: 25.0e6, market.bid_depth_usd_2pct: 0.1e6, market.ask_depth_usd_2pct: 0.2e6, market.open_interest_usd: 1.0e6}
+    values: {market.oi_cap_usd: 100.0e6, market.bid_depth_usd_2pct: 0.1e6, market.ask_depth_usd_2pct: 0.2e6, market.open_interest_usd: 1.0e6}
   - name: cap matched to depth is silent
     expect: silent
     provenance: synthetic

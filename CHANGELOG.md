@@ -1,5 +1,21 @@
 # Changelog
 
+## v3.1.0
+
+- **Calibrated thresholds.** `open_interest_exceeds_depth` (validator-operated
+  67.27, HIP-3 39.35), `oi_cap_exceeds_depth` (558.64) and
+  `mark_jump_short_window` (validator-operated 832.1 bps, HIP-3 725.3 bps),
+  computed from committed recordings of all 337 listed perps; method, data,
+  limitations and incident checks in `knowledge/calibration/`.
+- `record` and `calibrate` commands; calibration targets are a cross-sectional
+  rank (precondition rules) or an alert-episode budget (alert rules).
+- Threshold basis `definitional`; `calibrated` thresholds must cite their
+  result and match it exactly; fixtures run with their surface's profile.
+- A test recomputes every calibrated value from the committed data.
+- Finding: archived 20-level books cannot measure 2% depth (BTC: 0 of 157,225
+  snapshots; JELLY: levels spanned 0.7%); the archive check bounds ratios
+  instead.
+
 ## v3.0.0
 
 Rebuilt from first principles; see `docs/DESIGN.md` for the full rationale and

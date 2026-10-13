@@ -17,8 +17,8 @@
 | `linked_accounts_opposite_positions` | precondition | report | high | observed | synthetic only | node_data, public_api | yes | 2/3 |
 | `liquidator_loss_near_capacity` | active_attack | report | high | observed | synthetic only | public_api | yes | 1/1 |
 | `mark_diverges_from_oracle` | active_attack | report | medium | theoretical | synthetic only | public_api | yes | 1/1 |
-| `mark_jump_short_window` | active_attack | alert | high | observed | reconstructed incident | derived_history | yes | 1/1 |
-| `oi_cap_exceeds_depth` | precondition | report | medium | theoretical | synthetic only | public_api | yes | 1/1 |
-| `open_interest_exceeds_depth` | precondition | report | medium | observed | synthetic only | public_api | yes | 1/1 |
+| `mark_jump_short_window` | active_attack | alert | high | observed | reconstructed incident | derived_history | yes | 0/1 |
+| `oi_cap_exceeds_depth` | precondition | report | medium | theoretical | synthetic only | public_api | yes | 0/1 |
+| `open_interest_exceeds_depth` | precondition | report | medium | observed | synthetic only | public_api | yes | 0/1 |
 | `oracle_setter_holds_position` | precondition | report | high | theoretical | synthetic only | public_api | yes | 1/1 |
 | `privileged_role_exceeds_function` | pre_deployment | report | critical | reported | synthetic only | analyst, static_analysis | no (analyst input) | 0/0 |

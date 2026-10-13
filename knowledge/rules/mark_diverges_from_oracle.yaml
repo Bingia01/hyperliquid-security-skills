@@ -21,6 +21,9 @@ thresholds:
     value: 150.0
     unit: bps
     basis: placeholder
+    note: >-
+      Not calibrated - needs continuous mark and oracle history, which the
+      public API does not serve (Tardis derivative_ticker records it).
 condition: bps_diff(market.mark_price, market.oracle_price) >= threshold.max_mark_oracle_bps
 report:
   mark_oracle_bps: bps_diff(market.mark_price, market.oracle_price)

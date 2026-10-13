@@ -66,6 +66,8 @@ def quantile(values: Iterable[float], q: float) -> float:
     position = (len(ordered) - 1) * q
     low, high = math.floor(position), math.ceil(position)
     fraction = position - low
+    if fraction == 0 or ordered[low] == ordered[high]:
+        return ordered[low]  # also avoids inf - inf when both neighbours are infinite
     return ordered[low] + (ordered[high] - ordered[low]) * fraction
 
 
@@ -178,8 +180,10 @@ def cross_sectional(
         if row.get("surface") != surface:
             continue
         attempted += 1
+        # An infinite ratio (no depth at all inside the band) is the most exposed
+        # value, not an error; dropping it would bias the ranking toward safety.
         value = report_value(compiled, report_name, pass_values(row))
-        if value is not None and math.isfinite(value):
+        if value is not None:
             measured += 1
             per_market[row["coin"]].append(value)
     medians = {coin: statistics.median(v) for coin, v in per_market.items()}
