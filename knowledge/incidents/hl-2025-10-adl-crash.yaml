@@ -1,0 +1,39 @@
+id: hl-2025-10-adl-crash
+title: Market-wide crash triggers cross-margin auto-deleveraging
+period: {start: 2025-10-10, end: 2025-10-11}
+summary: >-
+  During the 10-11 October 2025 crash, liquidations outran available depth and
+  Hyperliquid triggered cross-margin auto-deleveraging for the first time in
+  over two years, force-closing profitable positions. The platform stayed up
+  and HLP reportedly gained about $40M. Critics argued auto-deleveraging closed
+  far more profitable exposure than necessary.
+control_owner: hypercore
+mechanisms: [market_stress]
+code_defect: absent
+surfaces: [core_perps]
+sources:
+  - {id: defiant, title: The ultimate 10/10 crash autopsy, publisher: The Defiant, url: "https://thedefiant.io/newsletter/defi-daily/the-ultimate-10-10-crash-autopsy", tier: news}
+  - {id: wublockchain, title: Hyperliquid activates cross-margin ADL, publisher: WuBlockchain, url: "https://wublock.substack.com/p/hyperliquid-activates-cross-margin", tier: news}
+  - {id: coingecko, title: Hyperliquid HLP vault analysis, publisher: CoinGecko, url: "https://www.coingecko.com/learn/hyperliquid-hlp-vault-analysis", tier: news}
+claims:
+  - id: adl
+    statement: Hyperliquid triggered cross-margin auto-deleveraging during the crash, the first time in over two years.
+    sources: [defiant, wublockchain]
+    core: true
+  - id: hlp_gain
+    statement: HLP reportedly gained about $40M over the crash.
+    sources: [coingecko, defiant]
+movie:
+  - phase: trigger
+    description: Market-wide crash; market makers pull liquidity.
+    claims: []
+  - phase: protocol_reaction
+    description: Liquidations outrun depth; auto-deleveraging closes profitable positions.
+    claims: [adl]
+  - phase: loss
+    description: Profitable traders force-closed at the previous mark; HLP gains overall.
+    claims: [hlp_gain]
+primitives: [liquidity_withdrawal_under_stress, exposure_exceeds_depth]
+invariants_violated: []
+open_questions:
+  - Was any invariant broken, or did the published last-resort rule work as designed? How much profitable exposure was deleveraged beyond what bankrupt accounts required?

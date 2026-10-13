@@ -1,0 +1,40 @@
+# Who owns the control that failed or was exploited.
+#
+# This is one of two independent classification axes (the other is
+# mechanisms.yaml). Keeping them separate is what lets the knowledge base say
+# "market manipulation (mechanism) against a core-protocol design (owner)"
+# without forcing an incident into a single bucket.
+
+- id: hypercore
+  name: Hyperliquid core protocol
+  description: >-
+    HyperCore as operated by the validator set: order books, clearinghouse,
+    margin and liquidation rules, the HLP vault and its liquidator sub-vaults,
+    the oracle, validator governance (delisting, settlement), and the bridge.
+
+- id: market_deployer
+  name: Market deployer
+  description: >-
+    A third party operating a builder-deployed perpetual dex (HIP-3) or outcome
+    markets (HIP-4) on HyperCore. Deployers set oracle and mark inputs, open
+    interest caps and margin tables, can halt trading (settling positions at
+    mark), and submit outcome settlements. Their stake is slashable by
+    validator vote.
+
+- id: hyperevm_application
+  name: HyperEVM application
+  description: >-
+    Third-party smart contracts on HyperEVM, including contracts that read
+    HyperCore state through precompiles or act on HyperCore through CoreWriter.
+
+- id: account_holder
+  name: Account holder
+  description: >-
+    A user, fund or institution and its custody of signing keys, API (agent)
+    wallets and token approvals.
+
+- id: infrastructure_operator
+  name: Infrastructure operator
+  description: >-
+    Off-chain services that users depend on to act: API servers, front ends,
+    RPC providers and node operators.

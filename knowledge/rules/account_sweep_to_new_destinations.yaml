@@ -1,0 +1,58 @@
+id: account_sweep_to_new_destinations
+title: Most of an account's value leaves within an hour to destinations it never used
+summary: >-
+  A key thief moves everything quickly to fresh addresses. Measuring the share
+  of value moved, and the share of that sent to never-used destinations,
+  catches the simplest drain (one transfer of everything to one new address),
+  which count-based rules ("3 new destinations and 2 bridges") miss.
+stage: post_loss
+mode: report
+severity: high
+consumer: Account holders and custodians monitoring their own accounts; investigators
+action: >-
+  Revoke API (agent) wallets, move remaining funds from accounts sharing the
+  key or seed, alert bridges and exchanges with destination addresses.
+applies_to: [user_accounts]
+scope: [account]
+detects: [stolen_key_sweep]
+protects: [signing_authority]
+anchors: [hl-2025-10-key-compromise]
+thresholds:
+  min_outflow_share:
+    value: 0.8
+    unit: ratio
+    basis: placeholder
+  min_new_destination_share:
+    value: 0.9
+    unit: ratio
+    basis: placeholder
+condition:
+  all:
+    - account.outflow_share_1h >= threshold.min_outflow_share
+    - account.new_destination_outflow_share_1h >= threshold.min_new_destination_share
+report:
+  outflow_share_1h: account.outflow_share_1h
+  new_destination_outflow_share_1h: account.new_destination_outflow_share_1h
+false_positives:
+  - scenario: The owner migrates to a new wallet.
+    distinguisher: Migration goes to one destination that then behaves like the owner; theft fans out and bridges.
+  - scenario: The owner deposits to a new exchange account.
+    distinguisher: Destination is a labeled exchange deposit address.
+limitations:
+  - Fires after the loss. Its value is limiting further loss on linked accounts and speeding recovery.
+fixtures:
+  - name: full drain to new addresses fires
+    expect: fires
+    provenance: synthetic
+    surface: user_accounts
+    values: {account.outflow_share_1h: 0.98, account.new_destination_outflow_share_1h: 1.0}
+  - name: routine withdrawal to a known address is silent
+    expect: silent
+    provenance: synthetic
+    surface: user_accounts
+    values: {account.outflow_share_1h: 0.95, account.new_destination_outflow_share_1h: 0.0}
+  - name: missing history is unknown
+    expect: unknown
+    provenance: synthetic
+    surface: user_accounts
+    values: {account.outflow_share_1h: 0.98}

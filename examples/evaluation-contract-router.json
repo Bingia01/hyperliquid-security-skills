@@ -1,0 +1,48 @@
+{
+  "subject": "Router.execute (Hyperdrive-style, as reported)",
+  "surface": "hyperevm_apps",
+  "observed_at": null,
+  "results": [
+    {
+      "rule": "caller_controlled_external_call",
+      "outcome": "fires",
+      "missing": [
+        "contract.post_call_balance_check"
+      ],
+      "report": {
+        "entrypoint_access": "anyone",
+        "post_call_balance_check": null
+      },
+      "thresholds": {},
+      "profile": null
+    },
+    {
+      "rule": "core_action_assumed_complete",
+      "outcome": "silent",
+      "missing": [
+        "contract.accounting_assumes_core_success"
+      ],
+      "report": {},
+      "thresholds": {},
+      "profile": null
+    },
+    {
+      "rule": "privileged_role_exceeds_function",
+      "outcome": "unknown",
+      "missing": [
+        "role.can_call_arbitrary_targets",
+        "role.can_move_user_assets",
+        "role.can_upgrade",
+        "role.function_requires_arbitrary_calls",
+        "role.function_requires_moving_assets",
+        "role.function_requires_upgrade",
+        "role.signer"
+      ],
+      "report": {
+        "signer": null
+      },
+      "thresholds": {},
+      "profile": null
+    }
+  ]
+}

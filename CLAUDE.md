@@ -1,17 +1,41 @@
 # CLAUDE.md
 
-When using this repository, follow the pipeline:
+This repository is a knowledge base plus a rule engine. The data lives in
+`knowledge/`; the code in `src/hyperliquid_security/` validates and evaluates
+it. Read `docs/DESIGN.md` before changing structure.
 
-1. classify the incident by surface and evidence tier,
-2. reconstruct an attack movie,
-3. extract primitives,
-4. map broken invariants,
-5. draft heuristics,
-6. map heuristics to machine-readable rules,
-7. choose the correct threshold profile.
+## Workflow
 
-## Important rules
-- Do not treat every loss on Hyperliquid as a core protocol bug.
-- Do not let `research_lead` incidents anchor strong rules.
-- Always map incidents to one of four buckets: core protocol, market abuse, user compromise, ecosystem app risk.
-- Use the architecture taxonomy in `docs/architecture/hyperliquid_attack_taxonomy.md` as the starting mental model. For HyperEVM and ecosystem-app analysis, also refer to `docs/architecture/hyperevm_vulnerability_taxonomy.md`.
+- Analyzing an incident: use the `analyze-incident` skill. Output is
+  `knowledge/incidents/<id>.yaml`.
+- Writing or tuning a rule: use the `author-rule` skill. Output is
+  `knowledge/rules/<id>.yaml` with passing fixtures.
+- Checking a live market: use the `monitor-market` skill.
+- Reviewing HyperEVM contracts: use the `hyperevm-review` skill.
+
+After any change to `knowledge/` or `src/`:
+
+```bash
+hyperliquid-security validate
+pytest
+hyperliquid-security report        # regenerate docs/generated/; never edit those by hand
+```
+
+## Rules that are never relaxed
+
+- Never cite a source you have not read, and never write a URL you did not
+  fetch or see verbatim. Set `citations_checked: true` only after reading every
+  cited source against every claim citing it.
+- A claim cites only sources that state it. Disagreements between sources
+  become separate claims.
+- Classify on two axes: `control_owner` (whose control failed) and
+  `mechanisms` (how). A loss on Hyperliquid is a core-protocol code defect only
+  when the evidence shows software violating its own specification.
+- Record losses with their basis: `realized`, `peak_unrealized` or
+  `reported_unspecified`.
+- Evidence tiers and rule statuses are derived; never write them by hand.
+- Do not fill missing data with defaults. Absent means `unknown`.
+- Every number in a rule condition is a named threshold with a unit and a
+  basis. Placeholders say so.
+- Facts about Hyperliquid mechanics change; verify against the live API or
+  current docs before relying on them, and date what you verified.

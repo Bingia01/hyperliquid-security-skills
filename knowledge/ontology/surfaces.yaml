@@ -1,0 +1,42 @@
+# Deployment contexts. Rules declare which surfaces they apply to; a profile
+# tunes thresholds for exactly one surface.
+
+- id: core_perps
+  name: Validator-operated perpetuals
+  control_owner: hypercore
+  description: >-
+    Perps listed by the validator set, priced by the stake-weighted median of
+    validators' weighted medians of external spot prices.
+
+- id: hyperps
+  name: Hyperps (pre-launch perpetuals)
+  control_owner: hypercore
+  description: >-
+    Perps without a liquid spot market. The oracle is an exponential moving
+    average of the market's own mark price, so mark/oracle divergence is
+    expected during trends and is not a manipulation signal by itself.
+
+- id: hip3_perps
+  name: Builder-deployed perpetuals (HIP-3)
+  control_owner: market_deployer
+  description: >-
+    Perps on a deployer's dex. The deployer (or its oracle updater or
+    sub-deployers) publishes oracle and mark inputs, sets open interest caps,
+    and can halt trading, which settles positions at mark.
+
+- id: hip4_outcomes
+  name: Outcome markets (HIP-4)
+  control_owner: market_deployer
+  description: >-
+    Fully collateralized yes/no contracts with no leverage or liquidation,
+    settled by a deployer-submitted fraction.
+
+- id: hyperevm_apps
+  name: HyperEVM applications
+  control_owner: hyperevm_application
+  description: Smart contracts deployed on HyperEVM.
+
+- id: user_accounts
+  name: User accounts
+  control_owner: account_holder
+  description: Individual or institutional accounts and their signing keys.

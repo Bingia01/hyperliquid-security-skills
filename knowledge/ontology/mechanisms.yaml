@@ -1,0 +1,52 @@
+# How value was extracted or a safety property was broken.
+# An incident may list several mechanisms (JELLY: manipulation + design exploit).
+
+- id: code_defect
+  name: Code defect
+  description: >-
+    Software did something its own specification does not intend. Only this
+    mechanism justifies the phrase "protocol bug" or "contract bug".
+
+- id: design_exploit
+  name: Design exploit
+  description: >-
+    The system behaved as specified, and the specification itself allowed a
+    profitable adversarial path (for example, liquidation being a cheaper exit
+    than closing on the book).
+
+- id: market_manipulation
+  name: Market manipulation
+  description: >-
+    Trading or order placement intended to move or misrepresent prices or
+    liquidity that the system or other traders rely on.
+
+- id: credential_compromise
+  name: Credential compromise
+  description: >-
+    An attacker obtained signing authority: private keys, API wallets,
+    approvals obtained by phishing, or a compromised signing device.
+
+- id: insider_abuse
+  name: Insider abuse
+  description: >-
+    A party with legitimate privileged access misused it: an exit scam, a
+    deployer abusing oracle or settlement powers, an operator moving
+    custodied funds.
+
+- id: operational_failure
+  name: Operational failure
+  description: >-
+    Outage, misconfiguration or capacity exhaustion with no adversary required.
+
+- id: reconnaissance
+  name: Reconnaissance
+  description: >-
+    Activity that probes a system or causes concern without a demonstrated
+    loss. Recorded for completeness; never used to anchor a rule.
+
+- id: market_stress
+  name: Market stress
+  description: >-
+    Extreme market-wide moves, with no identified adversary, that push the
+    system onto its last-resort mechanisms (backstop takeover,
+    auto-deleveraging).

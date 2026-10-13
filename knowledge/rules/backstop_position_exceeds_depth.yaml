@@ -1,0 +1,63 @@
+id: backstop_position_exceeds_depth
+title: The liquidation backstop holds a position the book cannot absorb
+summary: >-
+  The backstop (HLP's liquidator vaults, or a HIP-3 dex's liquidator) has taken
+  over a position larger than the depth it must trade into to exit. This is the
+  common state in JELLY, the March 2025 ETH liquidation and POPCAT, observed
+  after inheritance and before the loss is final.
+stage: active_attack
+mode: report
+severity: high
+consumer: Risk analysts, HLP depositors, HIP-3 deployers
+action: >-
+  Check whether the position is being unwound and at what slippage; check
+  whether the inheritance followed coordinated positioning (see the cluster
+  rules); for HIP-3, consider halting before the loss reaches auto-deleveraging.
+applies_to: [core_perps, hyperps, hip3_perps]
+scope: [market]
+detects: [backstop_inherits_unexitable_position]
+protects: [loss_containment]
+anchors: [hl-2025-03-jelly, hl-2025-03-eth-whale, hl-2025-11-popcat]
+thresholds:
+  max_backstop_to_depth:
+    value: 1.0
+    unit: ratio
+    basis: placeholder
+    note: >-
+      1.0 means the backstop cannot exit within 2% even if it takes all resting
+      depth on that side. Positions far below this unwind routinely.
+condition:
+  any:
+    - market.backstop_long_usd / market.bid_depth_usd_2pct >= threshold.max_backstop_to_depth
+    - market.backstop_short_usd / market.ask_depth_usd_2pct >= threshold.max_backstop_to_depth
+report:
+  long_to_bid_depth: market.backstop_long_usd / market.bid_depth_usd_2pct
+  short_to_ask_depth: market.backstop_short_usd / market.ask_depth_usd_2pct
+false_positives:
+  - scenario: The backstop absorbed a large liquidation during a fast move and depth refills within minutes.
+    distinguisher: Watch the ratio over the next snapshots; an unwinding position shrinks.
+  - scenario: Depth on Hyperliquid is thin but the asset trades deeply elsewhere and arbitrageurs will refill.
+    distinguisher: Compare with depth on the oracle's source venues.
+limitations:
+  - Since March 2025 the liquidator vaults are capped; losses beyond the cap go to auto-deleveraging, so the loss bearer may be profitable traders rather than HLP depositors.
+fixtures:
+  - name: inherited short larger than ask depth fires
+    expect: fires
+    provenance: synthetic
+    surface: core_perps
+    values: {market.backstop_long_usd: 0.0, market.backstop_short_usd: 4.0e6, market.bid_depth_usd_2pct: 1.0e6, market.ask_depth_usd_2pct: 0.5e6}
+  - name: small inventory is silent
+    expect: silent
+    provenance: synthetic
+    surface: core_perps
+    values: {market.backstop_long_usd: 0.1e6, market.backstop_short_usd: 0.0, market.bid_depth_usd_2pct: 1.0e6, market.ask_depth_usd_2pct: 1.0e6}
+  - name: a firing side decides even when the other side is unmeasured
+    expect: fires
+    provenance: synthetic
+    surface: hip3_perps
+    values: {market.backstop_long_usd: 3.0e6, market.bid_depth_usd_2pct: 1.0e6}
+  - name: unmeasured depth with no firing side is unknown
+    expect: unknown
+    provenance: synthetic
+    surface: core_perps
+    values: {market.backstop_long_usd: 0.1e6, market.backstop_short_usd: 2.0e6, market.bid_depth_usd_2pct: 1.0e6}

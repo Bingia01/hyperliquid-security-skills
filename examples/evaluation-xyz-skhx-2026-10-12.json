@@ -1,0 +1,175 @@
+{
+  "subject": "xyz:SKHX",
+  "surface": "hip3_perps",
+  "observed_at": "2026-10-12T16:09:27.509370+00:00",
+  "results": [
+    {
+      "rule": "backstop_position_exceeds_depth",
+      "outcome": "silent",
+      "missing": [],
+      "report": {
+        "long_to_bid_depth": 0.0,
+        "short_to_ask_depth": 0.0
+      },
+      "thresholds": {
+        "max_backstop_to_depth": 1.0
+      },
+      "profile": "hip3_perps"
+    },
+    {
+      "rule": "dex_deposits_exceed_slashable_stake",
+      "outcome": "fires",
+      "missing": [],
+      "report": {
+        "deposit_to_stake": 23.63609
+      },
+      "thresholds": {
+        "max_deposit_to_stake": 10.0
+      },
+      "profile": "hip3_perps"
+    },
+    {
+      "rule": "funded_cluster_same_direction",
+      "outcome": "unknown",
+      "missing": [
+        "cluster.combined_notional_usd",
+        "cluster.same_direction_share",
+        "cluster.shared_funding_source",
+        "cluster.wallet_count"
+      ],
+      "report": {
+        "wallet_count": null,
+        "cluster_to_thinner_side_depth": null
+      },
+      "thresholds": {
+        "max_cluster_to_depth": 1.0,
+        "min_same_direction_share": 0.8,
+        "min_wallets": 3.0
+      },
+      "profile": "hip3_perps"
+    },
+    {
+      "rule": "large_order_pulled_before_move",
+      "outcome": "unknown",
+      "missing": [
+        "order.adverse_move_bps_60s",
+        "order.lifetime_seconds",
+        "order.notional_usd",
+        "order.removal",
+        "order.same_side_depth_usd_2pct"
+      ],
+      "report": {
+        "order_to_depth": null,
+        "lifetime_seconds": null,
+        "adverse_move_bps_60s": null
+      },
+      "thresholds": {
+        "max_lifetime_seconds": 300.0,
+        "min_adverse_move_bps": 500.0,
+        "min_order_to_depth": 2.0
+      },
+      "profile": "hip3_perps"
+    },
+    {
+      "rule": "large_position_near_liquidation",
+      "outcome": "unknown",
+      "missing": [
+        "account.liquidation_distance_bps",
+        "account.position_notional_usd",
+        "account.position_side"
+      ],
+      "report": {
+        "liquidation_distance_bps": null,
+        "position_notional_usd": null
+      },
+      "thresholds": {
+        "max_liquidation_distance_bps": 300.0,
+        "max_position_to_depth": 1.0
+      },
+      "profile": "hip3_perps"
+    },
+    {
+      "rule": "linked_accounts_opposite_positions",
+      "outcome": "unknown",
+      "missing": [
+        "cluster.combined_notional_usd",
+        "cluster.same_direction_share",
+        "cluster.shared_funding_source",
+        "cluster.wallet_count"
+      ],
+      "report": {
+        "same_direction_share": null,
+        "cluster_to_thinner_side_depth": null
+      },
+      "thresholds": {
+        "max_cluster_to_depth": 1.0,
+        "max_same_direction_share": 0.7,
+        "min_wallets": 2.0
+      },
+      "profile": "hip3_perps"
+    },
+    {
+      "rule": "mark_diverges_from_oracle",
+      "outcome": "silent",
+      "missing": [],
+      "report": {
+        "mark_oracle_bps": 35.147878
+      },
+      "thresholds": {
+        "max_mark_oracle_bps": 100.0
+      },
+      "profile": "hip3_perps"
+    },
+    {
+      "rule": "mark_jump_short_window",
+      "outcome": "unknown",
+      "missing": [
+        "market.mark_move_bps_5m"
+      ],
+      "report": {
+        "mark_move_bps_5m": null
+      },
+      "thresholds": {
+        "max_mark_move_bps_5m": 700.0
+      },
+      "profile": "hip3_perps"
+    },
+    {
+      "rule": "oi_cap_exceeds_depth",
+      "outcome": "fires",
+      "missing": [],
+      "report": {
+        "cap_to_thinner_side_depth": 144.405916,
+        "cap_utilization": 0.269255
+      },
+      "thresholds": {
+        "max_cap_to_depth": 100.0
+      },
+      "profile": "hip3_perps"
+    },
+    {
+      "rule": "open_interest_exceeds_depth",
+      "outcome": "fires",
+      "missing": [],
+      "report": {
+        "oi_to_thinner_side_depth": 38.881988
+      },
+      "thresholds": {
+        "max_oi_to_depth": 20.0
+      },
+      "profile": "hip3_perps"
+    },
+    {
+      "rule": "oracle_setter_holds_position",
+      "outcome": "silent",
+      "missing": [],
+      "report": {
+        "oracle_setter_position_usd": 0.0
+      },
+      "thresholds": {
+        "min_conflicted_notional_usd": 100000.0
+      },
+      "profile": "hip3_perps"
+    }
+  ]
+}

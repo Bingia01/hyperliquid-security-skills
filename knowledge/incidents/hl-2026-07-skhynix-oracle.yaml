@@ -1,0 +1,74 @@
+id: hl-2026-07-skhynix-oracle
+title: One erroneous pre-market print crashes the xyz:SKHYNIX HIP-3 market
+period: {start: 2026-07-27, end: 2026-07-29}
+summary: >-
+  At the Korean pre-market open (23:00 UTC on 27 July 2026), a single-share
+  SK Hynix order on Nextrade executed at the daily lower limit, about 30% below
+  the previous close. Trade.xyz's oracle for its HIP-3 market xyz:SKHYNIX took
+  that print as the reference price; the oracle fell 15.6% (price bands capped
+  the raw move) and the mark fell about 18% within seconds. About 960 long
+  accounts were liquidated ($57.4M of positions, about $17.3M realized losses)
+  and about 100 short accounts were auto-deleveraged. The oracle had no outlier
+  rejection or cross-venue check. Trade.xyz covered eligible losses as a
+  one-time discretionary decision; Hyperliquid's core protocol did not
+  intervene.
+control_owner: market_deployer
+mechanisms: [operational_failure]
+code_defect: absent
+surfaces: [hip3_perps]
+losses:
+  - bearer: Liquidated long holders (later covered by Trade.xyz where eligible)
+    amount_usd_low: 17.3e6
+    amount_usd_high: 17.3e6
+    basis: realized
+    claims: [liquidations]
+sources:
+  - {id: galaxy, title: "Hyperliquid, Trade.xyz and the oracle liquidations", publisher: Galaxy Research, url: "https://www.galaxy.com/insights/research/hyperliquid-tradexyz-oracle-liquidations", tier: technical_secondary}
+  - {id: nexus, title: "xyz:SKHYNIX flash crash on Hyperliquid - incident report", publisher: Nexus Mutual, url: "https://nexusmutual.io/blog/xyz-skhynix-flash-crash-on-hyperliquid-incident-report", tier: technical_secondary, published: 2026-08-03}
+claims:
+  - id: single_print
+    statement: A single-share SK Hynix trade on Nextrade at 1,272,000 won, the daily lower limit about 30% below the previous close, was taken by the market's oracle as the reference price at the pre-market open.
+    sources: [galaxy, nexus]
+    core: true
+  - id: oracle_move
+    statement: The oracle fell from $1,131.40 to $954.99 (15.6%); price bands capped the raw ~29% move.
+    sources: [nexus]
+  - id: mark_fall
+    statement: The mark price fell about 18% within seconds (18.7% per Galaxy; 17.9% peak to trough per Nexus Mutual).
+    sources: [galaxy, nexus]
+    core: true
+  - id: liquidations
+    statement: About 960 long accounts were liquidated, closing $57.4M of positions with about $17.3M of realized losses.
+    sources: [nexus, galaxy]
+    core: true
+  - id: adl
+    statement: About 100 profitable short accounts were auto-deleveraged, realizing about $10.8M.
+    sources: [nexus]
+  - id: no_outlier_filter
+    statement: The oracle configuration had no outlier rejection, cross-venue sanity check or bounds test against the prior close; no smart contract was exploited.
+    sources: [nexus]
+  - id: response
+    statement: Trade.xyz said it would cover eligible liquidation losses as a one-time discretionary decision and maintained the oracle worked according to its specification; Hyperliquid's core protocol did not intervene.
+    sources: [galaxy, nexus]
+movie:
+  - phase: preconditions
+    description: The deployer's oracle switched to the thin Korean pre-market venue at its open, with no outlier rejection.
+    claims: [no_outlier_filter]
+  - phase: trigger
+    description: One erroneous one-share print at the lower limit.
+    claims: [single_print]
+  - phase: protocol_reaction
+    description: Oracle falls 15.6% (capped); mark falls about 18% within seconds.
+    claims: [oracle_move, mark_fall]
+  - phase: amplification
+    description: About 960 long accounts liquidate; the dex backstop absorbs and is itself liquidated; shorts auto-deleveraged.
+    claims: [liquidations, adl]
+  - phase: response
+    description: Discretionary compensation by the deployer.
+    claims: [response]
+primitives: [thin_external_price_source, deployer_controls_price_and_settlement]
+invariants_violated: [price_integrity]
+response: Trade.xyz compensated eligible losses; no protocol-level change reported.
+open_questions:
+  - HIP-3 docs limit how far each mark update can move; how did the mark fall ~18% within seconds - through the local book component, or did the limit not apply?
+citations_checked: true

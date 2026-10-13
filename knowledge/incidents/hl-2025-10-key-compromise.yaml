@@ -1,0 +1,43 @@
+id: hl-2025-10-key-compromise
+title: About $21M drained from a Hyperliquid user after a private key leak
+period: {start: 2025-10-09, end: 2025-10-10}
+summary: >-
+  An account (0x0cdC...E955) lost about 17.75M DAI and 3.11M msyrupUSDp after
+  its private key leaked; the assets were bridged to Ethereum and spread across
+  addresses. How the key leaked is unknown. Reports describe it as isolated to
+  the user, not a Hyperliquid failure.
+control_owner: account_holder
+mechanisms: [credential_compromise]
+code_defect: absent
+surfaces: [user_accounts]
+losses:
+  - bearer: The account holder
+    amount_usd_low: 20.6e6
+    amount_usd_high: 21.0e6
+    basis: realized
+    claims: [drain]
+sources:
+  - {id: theblock, title: $21 million stolen from Hyperliquid user after apparent private key compromise, publisher: The Block, url: "https://www.theblock.co/post/374145/21-million-stolen-from-hyperliquid-user-after-apparent-private-key-compromise-peckshield", tier: news, published: 2025-10-10}
+  - {id: coindesk, title: $21M crypto theft on Hyperliquid tied to private key leak, publisher: CoinDesk, url: "https://finance.yahoo.com/news/21m-crypto-theft-hyperliquid-tied-133841170.html", tier: news, published: 2025-10-10}
+claims:
+  - id: drain
+    statement: About 17.75M DAI and 3.11M msyrupUSDp were drained from one account after an apparent private key compromise, as flagged by PeckShield.
+    sources: [theblock, coindesk]
+    core: true
+  - id: bridged
+    statement: The stolen assets were bridged to Ethereum and spread across addresses.
+    sources: [theblock, coindesk]
+movie:
+  - phase: preconditions
+    description: Large balances under a single key.
+    claims: []
+  - phase: trigger
+    description: The attacker signs transfers with the leaked key.
+    claims: [drain]
+  - phase: loss
+    description: Assets bridged to Ethereum and dispersed.
+    claims: [bridged]
+primitives: [stolen_key_sweep, single_key_custody]
+invariants_violated: [signing_authority]
+open_questions:
+  - How was the key exposed?

@@ -1,0 +1,53 @@
+id: hl-2025-08-xpl-hyperp
+title: XPL pre-launch perp squeezed about 2.5x through a thin book
+period: {start: 2025-08-26, end: 2025-08-27}
+summary: >-
+  On the XPL hyperp (a pre-launch perp priced against its own mark history),
+  large buying cleared the order book and lifted the price about 2.5x to about
+  $1.80 while a pre-launch market elsewhere traded near $0.55. More than $17M
+  of mostly short positions were liquidated, followed by auto-deleveraging; no
+  bad debt was reported. Hyperliquid then capped hyperp marks relative to their
+  moving average and added external pre-launch prices where available.
+control_owner: hypercore
+mechanisms: [market_manipulation, design_exploit]
+code_defect: absent
+surfaces: [hyperps]
+losses:
+  - bearer: Liquidated short holders
+    amount_usd_low: 17.0e6
+    amount_usd_high: 17.0e6
+    basis: reported_unspecified
+    claims: [liquidations]
+sources:
+  - {id: theblock, title: Hyperliquid adds new safeguards following whale-driven XPL pre-market liquidations, publisher: The Block, url: "https://www.theblock.co/post/368486/hyperliquid-new-safeguards-following-whale-driven-xpl-pre-market-liquidations", tier: news, published: 2025-08-27}
+  - {id: dlnews, title: Hyperliquid whale inflates XPL token future contract price exposing vulnerabilities, publisher: DL News, url: "https://dlnews.com/articles/defi/hyperliquid-whale-inflates-xpl-token-future-contract-price-exposing-vulnerabilities", tier: news, published: 2025-08-27}
+claims:
+  - id: squeeze
+    statement: Large buying cleared the XPL hyperp order book and lifted the price about 2.5x, far above external pre-launch prices.
+    sources: [theblock, dlnews]
+    core: true
+  - id: liquidations
+    statement: More than $17M of positions, mostly shorts, were liquidated, followed by auto-deleveraging; no bad debt was reported.
+    sources: [theblock, dlnews]
+    core: true
+  - id: safeguards
+    statement: Hyperliquid capped hyperp mark prices relative to their 8-hour moving average and added external pre-launch prices to the mark where available.
+    sources: [theblock]
+movie:
+  - phase: preconditions
+    description: A hyperp with no external oracle and a thin book.
+    claims: []
+  - phase: trigger
+    description: Aggressive buying clears the book.
+    claims: [squeeze]
+  - phase: protocol_reaction
+    description: Shorts liquidated; auto-deleveraging follows.
+    claims: [liquidations]
+  - phase: response
+    description: Mark caps and external pre-launch price inputs added.
+    claims: [safeguards]
+primitives: [book_price_push, exposure_exceeds_depth]
+invariants_violated: [price_integrity]
+response: Hyperp mark cap relative to moving average; external pre-launch perp prices in the mark.
+open_questions:
+  - Reported whale profit ranges from about $15M to $46M across addresses.

@@ -1,0 +1,42 @@
+id: core_action_assumed_complete
+title: A contract books a HyperCore action as done in the same transaction
+summary: >-
+  CoreWriter actions run on HyperCore after the EVM block; orders and vault
+  transfers are deliberately delayed by seconds, and a failed HyperCore action
+  does not revert the EVM transaction. A contract that credits or debits users
+  as if the action already happened can be drained or made insolvent by actions
+  that fail or fill differently.
+stage: pre_deployment
+mode: report
+severity: high
+consumer: HyperEVM developers; auditors
+action: >-
+  Record pending actions and reconcile against HyperCore state (read
+  precompiles) in a later block before crediting users.
+applies_to: [hyperevm_apps]
+scope: [contract]
+detects: [assumed_synchronous_core_action]
+protects: [cross_domain_consistency]
+anchors: []
+condition: contract.uses_core_writer and contract.accounting_assumes_core_success
+false_positives:
+  - scenario: The booked effect is provisional and later reconciled.
+    distinguisher: Find the reconciliation path and confirm users cannot withdraw before it runs.
+limitations:
+  - Theoretical - no incident in this knowledge base exhibits it yet.
+fixtures:
+  - name: optimistic accounting fires
+    expect: fires
+    provenance: synthetic
+    surface: hyperevm_apps
+    values: {contract.uses_core_writer: true, contract.accounting_assumes_core_success: true}
+  - name: no CoreWriter use is silent
+    expect: silent
+    provenance: synthetic
+    surface: hyperevm_apps
+    values: {contract.uses_core_writer: false}
+  - name: unreviewed accounting is unknown
+    expect: unknown
+    provenance: synthetic
+    surface: hyperevm_apps
+    values: {contract.uses_core_writer: true}

@@ -1,0 +1,43 @@
+id: hl-2026-04-purrlend
+title: Purrlend admin powers used to mint unbacked tokens and borrow real assets
+period: {start: 2026-04-25, end: 2026-04-25}
+summary: >-
+  Purrlend, a lender on HyperEVM and MegaETH, lost about $1.52M after its admin
+  role (reported as a 2-of-3 multisig with no timelock) granted a bridge role
+  to an unknown address, which minted unbacked tokens and borrowed real assets
+  against them. Whether the admin keys were compromised or misused is not
+  established. Single news source with fetched detail; kept as a research lead.
+control_owner: hyperevm_application
+mechanisms: [credential_compromise, insider_abuse]
+code_defect: undetermined
+surfaces: [hyperevm_apps]
+losses:
+  - bearer: Purrlend lenders
+    amount_usd_low: 1.52e6
+    amount_usd_high: 1.52e6
+    basis: reported_unspecified
+    claims: [loss]
+sources:
+  - {id: cryptobriefing, title: DeFi attack impact - Purrlend drained, publisher: Crypto Briefing, url: "https://cryptobriefing.com/defi-attack-impact-purrlend-drained/", tier: news}
+claims:
+  - id: admin_grant
+    statement: An admin role granted a bridge role to an unknown address, which minted unbacked tokens and borrowed real assets against them.
+    sources: [cryptobriefing]
+    core: true
+  - id: loss
+    statement: About $1.52M was lost across HyperEVM (~$1.2M) and MegaETH (~$325K).
+    sources: [cryptobriefing]
+movie:
+  - phase: preconditions
+    description: Admin powers able to grant minting roles, reportedly without a timelock.
+    claims: []
+  - phase: trigger
+    description: Bridge role granted to an unknown address.
+    claims: [admin_grant]
+  - phase: loss
+    description: Unbacked mint and borrowing drain lenders.
+    claims: [loss]
+primitives: [overbroad_privileged_role, custodial_operator_control]
+invariants_violated: [delegated_scope, custody_conservation]
+open_questions:
+  - Compromise or insider? The multisig and timelock details come from search snippets, not fetched pages.

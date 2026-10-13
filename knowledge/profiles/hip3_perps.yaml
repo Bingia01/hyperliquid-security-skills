@@ -1,0 +1,14 @@
+id: hip3_perps
+surface: hip3_perps
+description: >-
+  Builder-deployed perps. Prices come from one deployer's feed, liquidity is
+  usually thinner, and the deployer can halt and settle, so exposure limits are
+  tightened relative to validator-operated perps. All values are placeholders
+  until calibrated on archived data.
+overrides:
+  open_interest_exceeds_depth:
+    max_oi_to_depth: 20.0
+  mark_diverges_from_oracle:
+    max_mark_oracle_bps: 100.0
+  mark_jump_short_window:
+    max_mark_move_bps_5m: 700.0

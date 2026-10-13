@@ -1,0 +1,57 @@
+id: hl-2025-09-hyperdrive
+title: Hyperdrive router's arbitrary calls drain positions it was an operator on
+period: {start: 2025-09-27, end: 2025-09-28}
+summary: >-
+  Users had made Hyperdrive's Router an operator on their positions. The Router
+  allowed arbitrary calls to whitelisted contracts, including the Market
+  contract, so an attacker called through it to act on victims' positions and
+  withdraw about $773K-$782K (USDT0 and thBILL). Markets were paused and
+  patched; Hyperdrive said affected accounts were remediated. No first-party
+  postmortem was found, so the root cause rests on CertiK's statement as
+  reported.
+control_owner: hyperevm_application
+mechanisms: [code_defect]
+code_defect: present
+surfaces: [hyperevm_apps]
+losses:
+  - bearer: Hyperdrive users (later remediated by the protocol)
+    amount_usd_low: 773.0e3
+    amount_usd_high: 782.0e3
+    basis: realized
+    claims: [loss]
+sources:
+  - {id: theblock, title: "Hyperliquid-based Hyperdrive loses $782,000 after smart contract exploit", publisher: The Block, url: "https://www.theblock.co/post/372662/hyperliquid-based-hyperdrive-loses-782000-after-smart-contract-exploit", tier: news, published: 2025-09-28}
+  - {id: cryptonews, title: Hyperdrive resumes services after $700K hack, publisher: crypto.news, url: "https://crypto.news/hyperliquid-hyperdrive-resumes-services-700k-hack-2025/", tier: news, published: 2025-09-29}
+claims:
+  - id: router_operator
+    statement: Users had set Hyperdrive's Router as an operator on their positions, letting it act on their funds.
+    sources: [theblock, cryptonews]
+    core: true
+  - id: router_arbitrary_call
+    statement: CertiK said the attacker repeatedly exploited an arbitrary call in the Router, which could call whitelisted contracts including the Market contract with attacker-chosen calldata.
+    sources: [theblock, cryptonews]
+    core: true
+  - id: loss
+    statement: About 672,934 USDT0 and 110,244 thBILL were taken from two markets, roughly $773K-$782K.
+    sources: [theblock]
+  - id: remediation
+    statement: Markets were paused and patched; on 2025-09-29 Hyperdrive said affected accounts were remediated and markets were back online.
+    sources: [cryptonews]
+movie:
+  - phase: preconditions
+    description: Users granted the Router operator rights; the Router forwarded caller-chosen calls to whitelisted contracts.
+    claims: [router_operator]
+  - phase: trigger
+    description: The attacker calls the Router's arbitrary-call path against the Market contract on victims' positions.
+    claims: [router_arbitrary_call]
+  - phase: loss
+    description: About $773K-$782K withdrawn and bridged out.
+    claims: [loss]
+  - phase: response
+    description: Pause, patch, remediation of affected accounts.
+    claims: [remediation]
+primitives: [arbitrary_call_injection, unbounded_external_call]
+invariants_violated: [delegated_scope, custody_conservation]
+response: Pause, patch with outside auditors, user remediation.
+open_questions:
+  - No first-party postmortem; exact vulnerable function unconfirmed.

@@ -1,0 +1,64 @@
+id: large_order_pulled_before_move
+title: A large order is cancelled shortly before price moves against its side
+summary: >-
+  A spoof wall advertises demand or supply that its owner never intends to
+  trade. The signature is size large relative to the book, a short life, removal
+  by cancellation rather than fill, and a price move against the advertised
+  side right after (POPCAT - a roughly $20M bid wall pulled before a 30% fall).
+stage: active_attack
+mode: report
+severity: high
+consumer: Risk analysts; market surveillance
+action: Link the order's account to positions that profit from the move; check liquidations in the window.
+applies_to: [core_perps, hyperps, hip3_perps]
+scope: [order]
+detects: [spoof_wall]
+protects: [price_integrity]
+anchors: [hl-2025-11-popcat]
+thresholds:
+  min_order_to_depth:
+    value: 2.0
+    unit: ratio
+    basis: placeholder
+    note: Relative to same-side depth, so one setting works for BTC and for thin markets; an absolute dollar size cannot.
+  max_lifetime_seconds:
+    value: 300.0
+    unit: seconds
+    basis: placeholder
+  min_adverse_move_bps:
+    value: 500.0
+    unit: bps
+    basis: placeholder
+condition:
+  all:
+    - order.removal == 'canceled'
+    - order.notional_usd / order.same_side_depth_usd_2pct >= threshold.min_order_to_depth
+    - order.lifetime_seconds <= threshold.max_lifetime_seconds
+    - order.adverse_move_bps_60s >= threshold.min_adverse_move_bps
+report:
+  order_to_depth: order.notional_usd / order.same_side_depth_usd_2pct
+  lifetime_seconds: order.lifetime_seconds
+  adverse_move_bps_60s: order.adverse_move_bps_60s
+false_positives:
+  - scenario: A market maker pulls quotes because the price is already moving (cause and effect reversed).
+    distinguisher: Ordering - did the move start before the cancel? Use order-level timestamps.
+  - scenario: Large resting orders cancelled during exchange-wide volatility.
+    distinguisher: Correlated moves across markets.
+limitations:
+  - Needs order-level data from a node; the public l2Book aggregates orders.
+fixtures:
+  - name: pulled wall then fall fires
+    expect: fires
+    provenance: synthetic
+    surface: core_perps
+    values: {order.removal: canceled, order.notional_usd: 20.0e6, order.same_side_depth_usd_2pct: 3.0e6, order.lifetime_seconds: 240.0, order.adverse_move_bps_60s: 1500.0}
+  - name: filled wall is liquidity, not a spoof
+    expect: silent
+    provenance: synthetic
+    surface: core_perps
+    values: {order.removal: filled, order.notional_usd: 20.0e6, order.same_side_depth_usd_2pct: 3.0e6, order.lifetime_seconds: 240.0, order.adverse_move_bps_60s: 1500.0}
+  - name: missing order data is unknown
+    expect: unknown
+    provenance: synthetic
+    surface: core_perps
+    values: {order.removal: canceled, order.notional_usd: 20.0e6}

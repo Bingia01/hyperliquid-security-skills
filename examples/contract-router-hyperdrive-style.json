@@ -1,0 +1,11 @@
+{
+  "surface": "hyperevm_apps",
+  "subject": "Router.execute (Hyperdrive-style, as reported)",
+  "values": {
+    "contract.holds_or_spends_user_assets": true,
+    "contract.call_target_control": "allowlisted",
+    "contract.call_data_control": "caller_supplied",
+    "contract.call_entrypoint_access": "anyone",
+    "contract.uses_core_writer": false
+  }
+}
