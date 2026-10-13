@@ -1,5 +1,24 @@
 # Changelog
 
+## v3.3.0
+
+- **Recording sessions.** `record --out-dir DIR --hours H` writes one gzipped
+  file per pass and a manifest; rerunning resumes the session, and
+  `--stop-after-hours` ends a run early with exit status 3. `pack` merges a
+  session into one file; `calibrate --passes` also reads a session directory.
+  Each row records the capital of the backstop that would inherit the market's
+  liquidations. (`record --out FILE --passes N` is gone.)
+- **`record` workflow** (`.github/workflows/record.yml`, run on demand): a
+  session as six-hour segments that resume one another, then `pack` and
+  `calibrate`, uploaded as the `recording` artifact.
+- **Growth rule materiality** is now `min_growth_usd` ($250k, placeholder)
+  instead of 1% of backstop capital, which was vacuous on HIP-3 (backstops held
+  $0-$104k). The rule no longer reads backstop features.
+- `calibrate` computes the growth rule's depth threshold to an alert budget of
+  one episode per day per surface (floor 1.0, rounded up).
+- Removed `calibration.base_rate` and the base-rate test, superseded by the
+  calibration.
+
 ## v3.2.0
 
 - **Open-interest growth rule** `open_interest_growth_exceeds_depth`: the last

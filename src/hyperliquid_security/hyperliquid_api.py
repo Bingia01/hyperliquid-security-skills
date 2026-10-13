@@ -200,7 +200,7 @@ def total_unrealized_pnl(state: dict[str, Any]) -> float:
     return sum(_f(i["position"].get("unrealizedPnl", 0)) for i in state.get("assetPositions", []))
 
 
-def hlp_liquidators(client: InfoClient) -> list[str]:
+def hlp_liquidators(client: Poster) -> list[str]:
     parent = client.post({"type": "vaultDetails", "vaultAddress": HLP_PARENT})
     children = parent.get("relationship", {}).get("data", {}).get("childAddresses", [])
     found = []

@@ -3,9 +3,12 @@
 Two datasets:
 
 * **Market passes** - every listed perp (validator-operated and HIP-3) per pass:
-  open interest, mark, oracle, HIP-3 open interest cap, and resting depth
-  within 2% of mid measured with escalating ``nSigFigs`` aggregation. One
-  JSON line per market per pass.
+  open interest, mark, oracle, HIP-3 open interest cap, resting depth within
+  2% of mid measured with escalating ``nSigFigs`` aggregation, and the
+  capital of the backstop that would inherit the market's liquidations. One
+  JSON line per market per pass. A recording session writes one compressed
+  file per pass into a directory with a manifest, so an interrupted session
+  resumes by running the same command again.
 * **Candle moves** - the most recent 5,000 five-minute candles per market
   (about 17 days), reduced to close-to-close moves in basis points. Candles
   are trade prices, so this is a proxy for mark-price moves, never a
@@ -19,15 +22,24 @@ recorder spends at most ``weight_per_minute`` of that budget.
 from __future__ import annotations
 
 import datetime as dt
+import gzip
 import itertools
 import json
+import os
 import time
 from collections import deque
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
-from .hyperliquid_api import ApiError, InfoClient, _Snapshot, measure_depth
+from .hyperliquid_api import (
+    ApiError,
+    InfoClient,
+    _Snapshot,
+    hip3_backstop_address,
+    hlp_liquidators,
+    measure_depth,
+)
 
 WEIGHTS = {"l2Book": 2, "allMids": 2, "clearinghouseState": 2}
 DEFAULT_WEIGHT = 20
@@ -77,11 +89,52 @@ def _now() -> dt.datetime:
     return dt.datetime.now(dt.UTC)
 
 
+REQUEST_ERRORS = (ApiError, KeyError, TypeError, ValueError, IndexError)
+
+
+def backstop_capital(client: MeteredClient, dexes: list[Any]) -> dict[str, float | None]:
+    """Account value of each backstop: HLP's liquidator vaults (key "core") and every
+    HIP-3 dex's backstop liquidator. A backstop that could not be measured is None."""
+    capital: dict[str, float | None] = {}
+    try:
+        liquidators = hlp_liquidators(client)
+        capital["core"] = (
+            sum(
+                float(
+                    client.post({"type": "clearinghouseState", "user": address})["marginSummary"][
+                        "accountValue"
+                    ]
+                )
+                for address in liquidators
+            )
+            if liquidators
+            else None
+        )
+    except REQUEST_ERRORS:
+        capital["core"] = None
+    for index, info in enumerate(dexes):
+        if not info:
+            continue
+        try:
+            state = client.post(
+                {
+                    "type": "clearinghouseState",
+                    "user": hip3_backstop_address(index),
+                    "dex": info["name"],
+                }
+            )
+            capital[info["name"]] = float(state["marginSummary"]["accountValue"])
+        except REQUEST_ERRORS:
+            capital[info["name"]] = None
+    return capital
+
+
 def record_pass(
     client: MeteredClient, now: Callable[[], dt.datetime] = _now
 ) -> Iterator[dict[str, Any]]:
     """Yield one row per listed, non-delisted perp across all dexes."""
     dexes = client.post({"type": "perpDexs"})
+    capital = backstop_capital(client, dexes)
     for index, info in enumerate(dexes):
         dex = info["name"] if info else None
         caps = dict(info.get("assetToStreamingOiCap") or []) if info else {}
@@ -110,11 +163,12 @@ def record_pass(
                 "open_interest_usd": float(context["openInterest"]) * mark,
                 "day_notional_volume_usd": float(context.get("dayNtlVlm") or 0.0),
                 "oi_cap_usd": float(caps[coin]) if coin in caps else None,
+                "backstop_account_value_usd": capital.get(dex or "core"),
             }
             depth = _Snapshot()
             try:
                 measure_depth(client, coin, depth)
-            except (ApiError, KeyError, TypeError, ValueError, IndexError) as exc:
+            except REQUEST_ERRORS as exc:
                 row["depth_error"] = str(exc)
             for side in ("bid", "ask"):
                 feature = f"market.{side}_depth_usd_2pct"
@@ -123,27 +177,102 @@ def record_pass(
             yield row
 
 
-def record(
+MANIFEST = "manifest.json"
+FILE_GLOB = "pass-*.jsonl.gz"
+FILE_NAME_FORMAT = "pass-%Y%m%dT%H%M%S.jsonl.gz"
+
+
+def _write_atomically(path: Path, data: bytes) -> None:
+    """Write via a temporary file and rename, so an interruption never leaves half a file."""
+    temporary = path.with_name(path.name + ".partial")
+    temporary.write_bytes(data)
+    os.replace(temporary, path)
+
+
+def recorded_passes(directory: Path) -> list[Path]:
+    return sorted(directory.glob(FILE_GLOB))
+
+
+def record_session(
     client: MeteredClient,
-    out: Path,
-    passes: int,
+    directory: Path,
+    hours: float,
     interval_seconds: float,
+    stop_after_hours: float | None = None,
+    now: Callable[[], dt.datetime] = _now,
+    sleep: Callable[[float], None] = time.sleep,
     log: Callable[[str], None] = print,
-) -> None:
-    """Append ``passes`` passes to ``out`` (JSON lines), starting one every interval."""
-    out.parent.mkdir(parents=True, exist_ok=True)
-    for number in range(1, passes + 1):
-        started = time.monotonic()
-        count = 0
-        with out.open("a", encoding="utf-8") as handle:
-            for row in record_pass(client):
-                row["pass"] = number
-                handle.write(json.dumps(row) + "\n")
-                count += 1
-        elapsed = time.monotonic() - started
-        log(f"pass {number}/{passes}: {count} rows in {elapsed:.0f}s")
-        if number < passes:
-            time.sleep(max(0.0, interval_seconds - elapsed))
+) -> bool:
+    """Record one pass every ``interval_seconds`` into ``directory`` for ``hours``.
+
+    The first run writes a manifest fixing the session's start, end and
+    interval; running again with the same directory resumes the session, so a
+    recording can span machines, jobs or restarts. ``stop_after_hours`` ends
+    this run early (for runners with a time limit) without ending the session.
+    Returns True once the session's end has passed.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    manifest_path = directory / MANIFEST
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest["api"] != client.base_url:
+            raise ValueError(f"{directory} records {manifest['api']}, not {client.base_url}")
+        log(f"resuming session {manifest['started_at']} to {manifest['ends_at']}")
+    else:
+        started = now()
+        manifest = {
+            "started_at": started.isoformat(),
+            "ends_at": (started + dt.timedelta(hours=hours)).isoformat(),
+            "interval_seconds": interval_seconds,
+            "api": client.base_url,
+        }
+        _write_atomically(manifest_path, (json.dumps(manifest, indent=2) + "\n").encode())
+    ends_at = dt.datetime.fromisoformat(manifest["ends_at"])
+    interval = dt.timedelta(seconds=manifest["interval_seconds"])
+    stop_at = ends_at
+    if stop_after_hours is not None:
+        stop_at = min(ends_at, now() + dt.timedelta(hours=stop_after_hours))
+
+    existing = recorded_passes(directory)
+    number = len(existing)
+    last_start = (
+        dt.datetime.strptime(existing[-1].name, FILE_NAME_FORMAT).replace(tzinfo=dt.UTC)
+        if existing
+        else None
+    )
+    while True:
+        due = now() if last_start is None else max(now(), last_start + interval)
+        if due >= stop_at:
+            break
+        wait = (due - now()).total_seconds()
+        if wait > 0:
+            sleep(wait)
+        started = now()
+        number += 1
+        lines = []
+        for row in record_pass(client, now):
+            row["pass"] = number
+            lines.append(json.dumps(row))
+        path = directory / started.strftime(FILE_NAME_FORMAT)
+        _write_atomically(path, gzip.compress(("\n".join(lines) + "\n").encode()))
+        elapsed = (now() - started).total_seconds()
+        log(f"pass {number}: {len(lines)} rows in {elapsed:.0f}s -> {path.name}")
+        last_start = started
+    complete = now() >= ends_at or (last_start is not None and last_start + interval >= ends_at)
+    log(f"{number} passes recorded; session {'complete' if complete else 'continues on rerun'}")
+    return complete
+
+
+def pack(directory: Path, out: Path) -> int:
+    """Concatenate a session's pass files, in time order, into one gzipped JSON lines file."""
+    count = 0
+    with gzip.open(out, "wt", encoding="utf-8") as handle:
+        for path in recorded_passes(directory):
+            with gzip.open(path, "rt", encoding="utf-8") as part:
+                for line in part:
+                    handle.write(line)
+                    count += 1
+    return count
 
 
 def candle_moves_bps(candles: list[dict[str, Any]]) -> list[float]:

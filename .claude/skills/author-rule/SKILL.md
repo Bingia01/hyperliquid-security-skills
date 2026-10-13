@@ -80,22 +80,25 @@ the validator checks the value matches.
 Decide the **target** before touching data:
 - precondition rules: a cross-sectional rank ("the most exposed tenth of
   markets") on each market's median ratio;
-- alert rules: an alert budget (episodes per day across a surface), because a
-  pager tolerates a fixed number of interruptions.
+- alert and active-attack rules: an alert budget (episodes per day across a
+  surface), because a pager tolerates a fixed number of interruptions.
+- When a rule has two thresholds, calibrate one and hold the other fixed, and
+  say which.
 
-Then record and compute:
+Then record and compute. A recording session resumes when the same command is
+rerun (exit status 3 means it stopped early), so a day can span restarts. On
+GitHub, the `record` workflow (Actions -> record -> Run workflow) splits a
+session into six-hour jobs and uploads the packed passes and the calibration
+results as the `recording` artifact.
 
 ```bash
-hyperliquid-security record --out passes.jsonl --passes 12 --interval-seconds 600
+hyperliquid-security record --out-dir recordings/2026-10-13 --hours 24 --interval-seconds 600
+hyperliquid-security pack recordings/2026-10-13 \
+  -o knowledge/calibration/data/passes_2026-10-13.jsonl.gz
 hyperliquid-security record --candles --out candles_5m.json
-hyperliquid-security calibrate --passes passes.jsonl --candles candles_5m.json \
-  --anchors knowledge/calibration/data/anchor_moves.json
+hyperliquid-security calibrate --passes knowledge/calibration/data/passes_2026-10-13.jsonl.gz \
+  --candles candles_5m.json --anchors knowledge/calibration/data/anchor_moves.json
 ```
-
-An uncalibrated threshold still states its base rate on committed data where
-data exists: `calibration.base_rate(kb, rule_id, samples)` evaluates the rule as
-written on recorded samples, and a test pins the numbers quoted in the note
-(see `test_growth_rule_base_rate_matches_its_notes`).
 
 Apply the printed values to the rule (`basis: calibrated`,
 `calibration: <id>`) and to profiles, and run `validate`. Never tune a

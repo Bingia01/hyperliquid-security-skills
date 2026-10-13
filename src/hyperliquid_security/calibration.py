@@ -35,9 +35,9 @@ import statistics
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
-from .engine import CompiledRule, Outcome, compile_rule, evaluate_rule
+from .engine import CompiledRule, compile_rule
 from .expressions import UNKNOWN, evaluate
 from .hyperliquid_api import HISTORY_WINDOWS_SECONDS
 from .knowledge_base import KnowledgeBase
@@ -153,12 +153,15 @@ def _open_text(path: Path) -> Any:
 
 
 def load_passes(path: Path) -> list[dict[str, Any]]:
+    """Market rows from a packed recording (.jsonl or .jsonl.gz) or a session directory."""
+    paths = sorted(path.glob("pass-*.jsonl.gz")) if path.is_dir() else [path]
     rows = []
-    with _open_text(path) as handle:
-        for line in handle:
-            row = json.loads(line)
-            if "coin" in row:
-                rows.append(row)
+    for each in paths:
+        with _open_text(each) as handle:
+            for line in handle:
+                row = json.loads(line)
+                if "coin" in row:
+                    rows.append(row)
     return rows
 
 
@@ -166,70 +169,47 @@ def pass_values(row: Mapping[str, Any]) -> dict[str, Any]:
     return {feature: row.get(column) for column, feature in PASS_FIELDS.items()}
 
 
-def open_interest_growth_samples(
-    rows: list[dict[str, Any]], backstop_capital: Mapping[str, float]
-) -> list[tuple[str, str, dict[str, Any]]]:
-    """(surface, market, values) for every pair of passes of one market whose
-    distance fits the open interest growth window: the values a snapshot taken
-    at the later pass, with the earlier one as ``--previous``, would hold.
+class GrowthSample(NamedTuple):
+    surface: str
+    market: str
+    observed_at: dt.datetime
+    values: dict[str, Any]
 
-    Passes store open interest in USD and the mark, so coin units are recovered
-    as their quotient. ``backstop_capital`` maps a dex name ("core" for
-    validator-operated perps) to its backstop's account value.
+
+def open_interest_growth_samples(rows: list[dict[str, Any]]) -> list[GrowthSample]:
+    """One sample per market per pass that has an earlier pass of the same market
+    in the open interest growth window: the values a snapshot taken at that pass,
+    with the earlier pass as ``--previous``, would hold. Like the adapter, it
+    uses the earlier pass nearest the middle of the window.
+
+    Passes store open interest in USD and the mark, so asset units are recovered
+    as their quotient.
     """
     low, high = HISTORY_WINDOWS_SECONDS["market.open_interest_change_usd_1h"]
-    by_market: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    middle = (low + high) / 2
+    by_market: dict[str, list[tuple[dt.datetime, dict[str, Any]]]] = defaultdict(list)
     for row in rows:
-        by_market[row["coin"]].append(row)
+        if row.get("mark_price"):
+            by_market[row["coin"]].append((dt.datetime.fromisoformat(row["observed_at"]), row))
     samples = []
     for market, series in sorted(by_market.items()):
-        series.sort(key=lambda r: r["observed_at"])
-        for i, earlier in enumerate(series):
-            start = dt.datetime.fromisoformat(earlier["observed_at"])
-            for later in series[i + 1 :]:
-                age = (dt.datetime.fromisoformat(later["observed_at"]) - start).total_seconds()
-                if not low <= age <= high or not earlier["mark_price"] or not later["mark_price"]:
-                    continue
-                before = earlier["open_interest_usd"] / earlier["mark_price"]
-                after = later["open_interest_usd"] / later["mark_price"]
-                values = pass_values(later)
-                values["market.open_interest_change_usd_1h"] = (after - before) * later[
-                    "mark_price"
-                ]
-                values["backstop.liquidator_account_value_usd"] = backstop_capital.get(
-                    later["dex"] or "core"
-                )
-                samples.append((later["surface"], market, values))
+        series.sort(key=lambda item: item[0])
+        times = [when for when, _ in series]
+        for when, later in series:
+            first = bisect.bisect_left(times, when - dt.timedelta(seconds=high))
+            last = bisect.bisect_right(times, when - dt.timedelta(seconds=low))
+            if first >= last:
+                continue
+            earlier = min(
+                (series[i] for i in range(first, last)),
+                key=lambda item: abs((when - item[0]).total_seconds() - middle),
+            )[1]
+            before = earlier["open_interest_usd"] / earlier["mark_price"]
+            after = later["open_interest_usd"] / later["mark_price"]
+            values = pass_values(later)
+            values["market.open_interest_change_usd_1h"] = (after - before) * later["mark_price"]
+            samples.append(GrowthSample(later["surface"], market, when, values))
     return samples
-
-
-def base_rate(
-    kb: KnowledgeBase, rule_id: str, samples: list[tuple[str, str, dict[str, Any]]]
-) -> dict[str, dict[str, Any]]:
-    """Per surface: how many samples the rule saw, fired on or could not decide, and
-    which markets fired at least once - evaluated by the engine with the surface's
-    profile, so the count is of the rule exactly as written."""
-    compiled = compile_rule(kb.rules[rule_id], kb.features)
-    out: dict[str, dict[str, Any]] = {}
-    for surface, market, values in samples:
-        present = {k: v for k, v in values.items() if v is not None}
-        result = evaluate_rule(compiled, present, surface, profile_for(kb, surface))
-        if result.outcome is Outcome.not_applicable:
-            continue
-        entry = out.setdefault(
-            surface, {"samples": 0, "fires": 0, "unknown": 0, "markets": set(), "firing": set()}
-        )
-        entry["samples"] += 1
-        entry["markets"].add(market)
-        if result.outcome is Outcome.fires:
-            entry["fires"] += 1
-            entry["firing"].add(market)
-        elif result.outcome is Outcome.unknown:
-            entry["unknown"] += 1
-    for entry in out.values():
-        entry["markets"] = len(entry["markets"])
-        entry["firing"] = sorted(entry["firing"])
-    return out
 
 
 def cross_sectional(
@@ -599,3 +579,147 @@ def calibrate_mark_moves(
         "checks": checks,
         "results": per_surface,
     }
+
+
+GROWTH_RULE = "open_interest_growth_exceeds_depth"
+# Below 1.0 the hour's new positions can be closed within 2%, so a lower calibrated
+# value would flag growth the book absorbs; the definitional value is the floor.
+GROWTH_DEPTH_FLOOR = 1.0
+
+
+def _effective_threshold(kb: KnowledgeBase, rule_id: str, name: str, surface: str) -> float:
+    profile = profile_for(kb, surface)
+    if profile is not None and name in profile.overrides.get(rule_id, {}):
+        return profile.overrides[rule_id][name]
+    return kb.rules[rule_id].thresholds[name].value
+
+
+def calibrate_open_interest_growth(
+    kb: KnowledgeBase,
+    rows: list[dict[str, Any]],
+    computed: dt.date,
+) -> dict[str, Any]:
+    """Alert-budget calibration of the growth rule's depth threshold, holding its
+    materiality threshold (min_growth_usd) at the rule's current value."""
+    compiled = compile_rule(kb.rules[GROWTH_RULE], kb.features)
+    samples = open_interest_growth_samples(rows)
+    per_surface: dict[str, dict[str, Any]] = {}
+    for surface in ("core_perps", "hip3_perps"):
+        floor_usd = _effective_threshold(kb, GROWTH_RULE, "min_growth_usd", surface)
+        series: dict[str, list[float]] = defaultdict(list)
+        unknown = small = 0
+        sized: list[float] = []
+        times = []
+        for sample in sorted(
+            (s for s in samples if s.surface == surface), key=lambda s: s.observed_at
+        ):
+            times.append(sample.observed_at)
+            depth = report_value(compiled, "growth_to_thinner_side_depth", sample.values)
+            growth = report_value(compiled, "growth_usd", sample.values)
+            if growth is not None and growth < floor_usd:
+                small += 1  # the rule is silent here whatever the depth
+                series[sample.market].append(-math.inf)
+            elif depth is None or growth is None:
+                unknown += 1  # the rule cannot decide; it cannot fire either
+                series[sample.market].append(-math.inf)
+            else:
+                sized.append(depth)
+                series[sample.market].append(depth)
+        if not times:
+            raise ValueError(f"no growth samples on {surface}")
+        days = (max(times) - min(times)).total_seconds() / 86_400
+        allowed = max(1, math.floor(ALERT_EPISODES_PER_DAY * days))
+        budget, _ = budget_threshold(series, allowed)
+        if budget == math.inf:
+            # Infinite ratios (growth with no depth at all inside the band) alone exceed the
+            # budget: no threshold meets it, and choosing one is a decision for a person.
+            raise ValueError(f"{surface}: no threshold keeps growth alerts within the budget")
+        # Round up, never down: a lower value could admit episodes beyond the budget.
+        value = math.ceil(max(GROWTH_DEPTH_FLOOR, budget) * 100) / 100
+        contributors = sorted(
+            ((market, episodes(s, value)) for market, s in series.items()),
+            key=lambda kv: (-kv[1], kv[0]),
+        )
+        finite = [v for v in sized if math.isfinite(v)]
+        per_surface[surface] = {
+            "markets": len(series),
+            "windows": len(times),
+            "unknown_windows": unknown,
+            "windows_below_min_growth": small,
+            "min_growth_usd": floor_usd,
+            "days": round(days, 2),
+            "episodes_per_day_budget": ALERT_EPISODES_PER_DAY,
+            "episodes_allowed": allowed,
+            "budget_value": round(budget, 2) if math.isfinite(budget) else str(budget),
+            "value": value,
+            "episodes_at_value": episodes_total(series, value),
+            "sized_window_quantiles": (
+                {
+                    name: round(quantile(finite, q), 3)
+                    for name, q in (("p50", 0.5), ("p90", 0.9), ("p99", 0.99), ("max", 1.0))
+                }
+                if finite
+                else {}
+            ),
+            "infinite_ratio_windows": len(sized) - len(finite),
+            "episodes_by_market": [
+                {"market": market, "episodes": n} for market, n in contributors if n > 0
+            ],
+        }
+    window = _window(rows)
+    return {
+        "id": "open_interest_growth_alert_budget",
+        "computed": computed.isoformat(),
+        "method": (
+            "For every market at every pass, the change in open interest since the pass 55-65 "
+            "minutes earlier nearest 60 minutes (in asset units, valued at the later mark), "
+            "divided by the thinner side's resting depth within 2% of mid: the rule's own "
+            "growth_to_thinner_side_depth. Windows where the change is below the rule's "
+            "min_growth_usd cannot fire and count as silent. Threshold = the lowest value at "
+            "which it, and every higher "
+            f"value, yields at most {ALERT_EPISODES_PER_DAY:g} episode per day across the "
+            "surface (consecutive firing windows in one market are one episode), floored at the "
+            f"definitional {GROWTH_DEPTH_FLOOR:g}. The budget is the paging rule's, chosen before "
+            "the data so that promoting the rule to alert needs evidence, not recalibration."
+        ),
+        "data": f"Live public API recording of every listed perp: {window}.",
+        "limitations": [
+            "One day in one market regime; news-driven or stressed days are absent.",
+            "The materiality threshold (min_growth_usd) is a placeholder held fixed; only the "
+            "depth threshold is calibrated, conditional on it.",
+            "Open interest change is net of closes, so heavy turnover hides some new positions.",
+            "Hyperps cannot be told apart from validator-operated perps in the API and are "
+            "pooled into core_perps.",
+        ],
+        "targets": [
+            {
+                "rule": GROWTH_RULE,
+                "threshold": "max_growth_to_depth",
+                "surface": "core_perps",
+                "applies_as": "rule_default",
+                "value": per_surface["core_perps"]["value"],
+            },
+            {
+                "rule": GROWTH_RULE,
+                "threshold": "max_growth_to_depth",
+                "surface": "hip3_perps",
+                "applies_as": "profile_override",
+                "value": per_surface["hip3_perps"]["value"],
+            },
+        ],
+        "checks": [
+            {
+                "description": (
+                    "JELLY (2025-03-26), POPCAT (2025-11-12) and FARTCOIN (2026-04-09): hourly "
+                    "open interest and 2% depth on the attack days. Hyperliquid's API keeps no "
+                    "open interest history, and Tardis's free days are the first of each month."
+                ),
+                "outcome": "not checked: no source for the anchors' hourly open interest was found",
+            }
+        ],
+        "results": per_surface,
+    }
+
+
+def episodes_total(series_by_market: Mapping[str, list[float]], threshold: float) -> int:
+    return sum(episodes(series, threshold) for series in series_by_market.values())

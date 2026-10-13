@@ -1,0 +1,150 @@
+name: record
+
+# Record market passes for calibration, on demand: Actions -> record -> Run workflow.
+#
+# GitHub-hosted jobs stop at six hours, so the session runs as segments, one at a
+# time, each resuming the same recording (`hyperliquid-security record` keeps a
+# manifest and one file per pass). A final job packs the passes and runs the
+# calibration. Nothing is written to the repository: download the `recording`
+# artifact, commit the packed file under knowledge/calibration/data/, apply the
+# values `calibrate` printed, and run `hyperliquid-security validate`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: Session length in hours (at most 30)
+        required: true
+        default: "24"
+      interval_seconds:
+        description: Seconds between the starts of two passes (a pass takes about 7 minutes)
+        required: true
+        default: "600"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash  # adds -o pipefail, so a failure before `| tee` fails the step
+
+concurrency:
+  group: record
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      segments: ${{ steps.plan.outputs.segments }}
+    steps:
+      - id: plan
+        env:
+          HOURS: ${{ inputs.hours }}
+          INTERVAL: ${{ inputs.interval_seconds }}
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json, math, os
+          hours, interval = float(os.environ["HOURS"]), float(os.environ["INTERVAL"])
+          if not 0 < hours <= 30 or interval < 60:
+              raise SystemExit("hours must be in (0, 30] and interval_seconds at least 60")
+          # Each segment records for up to 5.4 hours; one spare covers start-up delays.
+          segments = math.ceil(hours / 5.4) + 1
+          print("segments=" + json.dumps(list(range(1, segments + 1))))
+          EOF
+
+  record:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      max-parallel: 1
+      fail-fast: false
+      matrix:
+        segment: ${{ fromJSON(needs.plan.outputs.segments) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e .
+      - name: Fetch the session so far
+        uses: actions/download-artifact@v4
+        with:
+          pattern: session-*
+          path: session
+          merge-multiple: true
+      - name: Record, resuming the session
+        env:
+          HOURS: ${{ inputs.hours }}
+          INTERVAL: ${{ inputs.interval_seconds }}
+        run: |
+          mkdir -p session new
+          if [ "${{ matrix.segment }}" != 1 ] && [ ! -f session/manifest.json ]; then
+            echo "earlier segments left no manifest; refusing to start a second session" >&2
+            exit 1
+          fi
+          ls session > before.txt
+          status=0
+          hyperliquid-security record --out-dir session --hours "$HOURS" \
+            --interval-seconds "$INTERVAL" --stop-after-hours 5.4 || status=$?
+          # 0: session complete; 3: stopped early and resumes in the next segment.
+          if [ "$status" != 0 ] && [ "$status" != 3 ]; then exit "$status"; fi
+          for path in session/*; do
+            name=$(basename "$path")
+            grep -qxF "$name" before.txt || cp "$path" new/
+          done
+          echo "$(ls new | wc -l) new files in segment ${{ matrix.segment }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: session-${{ matrix.segment }}
+          path: new/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  calibrate:
+    needs: record
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -e .
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: session-*
+          path: session
+          merge-multiple: true
+      - name: Pack
+        id: pack
+        run: |
+          day=$(python3 -c "import json; print(json.load(open('session/manifest.json'))['started_at'][:10])")
+          mkdir -p out
+          cp session/manifest.json out/
+          hyperliquid-security pack session -o "out/passes_${day}.jsonl.gz"
+          echo "file=out/passes_${day}.jsonl.gz" >> "$GITHUB_OUTPUT"
+      - name: Calibrate
+        env:
+          PASSES: ${{ steps.pack.outputs.file }}
+        run: |
+          hyperliquid-security calibrate --passes "$PASSES" --computed "$(date -u +%F)" \
+            | tee out/calibrate.txt
+          git status --porcelain knowledge/calibration | awk '{print $2}' | xargs -r cp -t out/
+          # Thresholds that no longer match their recomputed results are listed here.
+          hyperliquid-security validate | tee out/validate.txt || true
+          {
+            echo "## Recording $(basename "$PASSES")"
+            echo '```'
+            cat out/calibrate.txt out/validate.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.pack.outcome == 'success' }}
+        with:
+          name: recording
+          path: out/
+          retention-days: 90
