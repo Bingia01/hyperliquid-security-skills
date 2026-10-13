@@ -17,15 +17,15 @@ markets, HyperEVM applications and user accounts.
 Read [docs/DESIGN.md](docs/DESIGN.md) for the reasoning, assumptions and
 constraints, and for what changed from v1/v2 and why.
 
-## Status at v3.1.0, stated plainly
+## Status at v3.2.0, stated plainly
 
 Live numbers are in the generated reports; these describe the release.
 
 - 14 incidents (derived tiers: 2 confirmed, 8 credible reports, 4 research leads).
   Claim-to-source mappings were verified line by line for JELLY and
   xyz:SKHYNIX; the rest come from a research pass and are marked unchecked.
-- 16 rules. Five threshold values are calibrated on recorded market data to
-  stated targets (see [calibration.md](docs/generated/calibration.md)); four
+- 17 rules. Five threshold values are calibrated on recorded market data to
+  stated targets (see [calibration.md](docs/generated/calibration.md)); five
   are definitional; the rest are placeholders and say so. Two rules have
   fixtures reconstructed from real incidents; the rest are validated on
   synthetic fixtures, which test logic only.
@@ -52,6 +52,10 @@ hyperliquid-security evaluate eth.json            # run every applicable rule
 
 hyperliquid-security snapshot --coin xyz:SKHX --dex xyz -o skhx.json
 hyperliquid-security evaluate skhx.json           # HIP-3 profile applied automatically
+
+# History features compare with earlier snapshots of the same market:
+# one 4-6 minutes old (mark move), one 55-65 minutes old (open interest growth).
+hyperliquid-security snapshot --coin ETH --previous eth-5m.json --previous eth-1h.json -o eth.json
 ```
 
 Example (recorded 2026-10-12, see `examples/`): on HIP-3 market xyz:SKHX the

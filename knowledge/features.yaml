@@ -28,6 +28,14 @@
     type: public_api
     detail: metaAndAssetCtxs (with "dex" for HIP-3) -> openInterest (coin units) x markPx.
 
+- id: market.open_interest_base_asset
+  kind: number
+  unit: base_asset
+  description: Open interest (one side) in units of the traded asset; kept so later snapshots can measure growth.
+  source:
+    type: public_api
+    detail: metaAndAssetCtxs (with "dex" for HIP-3) -> openInterest.
+
 - id: market.mark_price
   kind: number
   unit: usd
@@ -122,6 +130,21 @@
     detail: >-
       Two metaAndAssetCtxs snapshots (markPx). Candles are trade prices, not
       mark, so mark history must be recorded; there is no mark history endpoint.
+
+- id: market.open_interest_change_usd_1h
+  kind: number
+  unit: usd
+  description: >-
+    Change in open interest over the last hour, counted in asset units and
+    valued at the current mark, so a price move alone is not growth. Negative
+    when positions closed on net.
+  source:
+    type: derived_history
+    detail: >-
+      market.open_interest_base_asset now minus its value in a snapshot taken 55
+      to 65 minutes earlier, times markPx now. There is no open interest history
+      endpoint, so the earlier snapshot must be recorded. The change is net:
+      positions opened while others close are partly hidden.
 
 # --- backstop -----------------------------------------------------------------
 

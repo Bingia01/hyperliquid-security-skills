@@ -208,7 +208,7 @@ docs/generated/       computed summaries
 
 ## 8. Status and next steps
 
-What runs today: validation of 14 incidents and 16 rules, live snapshots and
+What runs today: validation of 14 incidents and 17 rules, live snapshots and
 evaluation for validator-operated and HIP-3 markets, generated reports, four
 skills.
 
@@ -217,9 +217,10 @@ Ordered by value:
    compare; calibrate `mark_diverges_from_oracle` from continuous mark and
    oracle history (Tardis `derivative_ticker`); normalize price moves by each
    market's volatility so alerts spread across markets.
-2. **Open-interest growth rule** - the JELLY archive check shows a level-based
-   exposure rule had no lead time: the attacker created the exposure on the day.
-   Open-interest growth relative to depth would see it.
+2. **Calibrate the open-interest growth rule** (added in v3.2.0, see §9) to an
+   episode budget; that needs passes over at least a day, recording the
+   backstops' capital alongside, and a reconstruction of how fast JELLY's,
+   POPCAT's and FARTCOIN's positions were built.
 3. **Reconstruct anchors** - add depth and position numbers to incident
    records from archives, so depth-based rules get reconstructed fixtures.
 4. **Node-data adapter** - order lifetimes, fills with liquidation tags,
@@ -274,4 +275,25 @@ so the search walks down from the top).
 `tests/test_calibration.py` recomputes every calibrated value from the committed
 data, so a value, a rule's report expression or the data cannot change without
 the others.
+
+**Open-interest growth (v3.2.0).** The JELLY check above shows a level-based
+exposure rule had no lead time: the attacker created the exposure on the day.
+`open_interest_growth_exceeds_depth` measures the last hour's new open interest
+(in asset units, valued at the current mark, so a price move is not growth)
+against the thinner side's 2% depth. It is uncalibrated: two hours of passes
+give one hour of comparisons, too little for an episode budget. What the
+recording does show, evaluated by the engine on the rule as written:
+
+- With depth alone at 1.0 (definitional: the hour's new positions cannot be
+  closed within 2%), 6 of 178 validator-operated markets fired, mostly small
+  ones - PURR's $61k of new positions against $12k of depth.
+- A second condition, new positions of at least 1% of the backstop's capital
+  (placeholder; $330k against HLP's liquidators, $33.0M on 2026-10-13), leaves
+  3 validator-operated markets (GRASS, PONS, TIA). On HIP-3 it changes nothing:
+  every dex's backstop held $0-$104k, so 5 of 159 HIP-3 markets fire on depth
+  alone, and any loss there goes straight to auto-deleveraging.
+
+The rule therefore stays in `report` mode. A pager would need the episode
+budget above, and evidence that the anchors' build-ups were fast enough to fire
+before their liquidations.
 

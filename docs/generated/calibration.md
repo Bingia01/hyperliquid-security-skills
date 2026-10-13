@@ -30,6 +30,8 @@ Where every threshold value comes from. *calibrated* values were computed by `hy
 | `open_interest_exceeds_depth` | `max_oi_to_depth` | default | 67.27 ratio | calibrated | `open_interest_to_depth_cross_section` |
 | `open_interest_exceeds_depth` | `max_oi_to_depth` | hip3_perps | 39.35 ratio | calibrated | `open_interest_to_depth_cross_section` |
 | `open_interest_exceeds_depth` | `max_oi_to_depth` | hyperps | 20 ratio | placeholder | - |
+| `open_interest_growth_exceeds_depth` | `max_growth_to_depth` | default | 1 ratio | definitional | - |
+| `open_interest_growth_exceeds_depth` | `min_growth_to_backstop` | default | 0.01 ratio | placeholder | - |
 | `oracle_setter_holds_position` | `min_conflicted_notional_usd` | default | 100000 usd | placeholder | - |
 
 ## `mark_move_alert_budget` (computed 2026-10-13)

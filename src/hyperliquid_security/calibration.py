@@ -37,9 +37,11 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-from .engine import CompiledRule, compile_rule
+from .engine import CompiledRule, Outcome, compile_rule, evaluate_rule
 from .expressions import UNKNOWN, evaluate
+from .hyperliquid_api import HISTORY_WINDOWS_SECONDS
 from .knowledge_base import KnowledgeBase
+from .validate import profile_for
 
 PASS_FIELDS = {
     "open_interest_usd": "market.open_interest_usd",
@@ -162,6 +164,72 @@ def load_passes(path: Path) -> list[dict[str, Any]]:
 
 def pass_values(row: Mapping[str, Any]) -> dict[str, Any]:
     return {feature: row.get(column) for column, feature in PASS_FIELDS.items()}
+
+
+def open_interest_growth_samples(
+    rows: list[dict[str, Any]], backstop_capital: Mapping[str, float]
+) -> list[tuple[str, str, dict[str, Any]]]:
+    """(surface, market, values) for every pair of passes of one market whose
+    distance fits the open interest growth window: the values a snapshot taken
+    at the later pass, with the earlier one as ``--previous``, would hold.
+
+    Passes store open interest in USD and the mark, so coin units are recovered
+    as their quotient. ``backstop_capital`` maps a dex name ("core" for
+    validator-operated perps) to its backstop's account value.
+    """
+    low, high = HISTORY_WINDOWS_SECONDS["market.open_interest_change_usd_1h"]
+    by_market: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        by_market[row["coin"]].append(row)
+    samples = []
+    for market, series in sorted(by_market.items()):
+        series.sort(key=lambda r: r["observed_at"])
+        for i, earlier in enumerate(series):
+            start = dt.datetime.fromisoformat(earlier["observed_at"])
+            for later in series[i + 1 :]:
+                age = (dt.datetime.fromisoformat(later["observed_at"]) - start).total_seconds()
+                if not low <= age <= high or not earlier["mark_price"] or not later["mark_price"]:
+                    continue
+                before = earlier["open_interest_usd"] / earlier["mark_price"]
+                after = later["open_interest_usd"] / later["mark_price"]
+                values = pass_values(later)
+                values["market.open_interest_change_usd_1h"] = (after - before) * later[
+                    "mark_price"
+                ]
+                values["backstop.liquidator_account_value_usd"] = backstop_capital.get(
+                    later["dex"] or "core"
+                )
+                samples.append((later["surface"], market, values))
+    return samples
+
+
+def base_rate(
+    kb: KnowledgeBase, rule_id: str, samples: list[tuple[str, str, dict[str, Any]]]
+) -> dict[str, dict[str, Any]]:
+    """Per surface: how many samples the rule saw, fired on or could not decide, and
+    which markets fired at least once - evaluated by the engine with the surface's
+    profile, so the count is of the rule exactly as written."""
+    compiled = compile_rule(kb.rules[rule_id], kb.features)
+    out: dict[str, dict[str, Any]] = {}
+    for surface, market, values in samples:
+        present = {k: v for k, v in values.items() if v is not None}
+        result = evaluate_rule(compiled, present, surface, profile_for(kb, surface))
+        if result.outcome is Outcome.not_applicable:
+            continue
+        entry = out.setdefault(
+            surface, {"samples": 0, "fires": 0, "unknown": 0, "markets": set(), "firing": set()}
+        )
+        entry["samples"] += 1
+        entry["markets"].add(market)
+        if result.outcome is Outcome.fires:
+            entry["fires"] += 1
+            entry["firing"].add(market)
+        elif result.outcome is Outcome.unknown:
+            entry["unknown"] += 1
+    for entry in out.values():
+        entry["markets"] = len(entry["markets"])
+        entry["firing"] = sorted(entry["firing"])
+    return out
 
 
 def cross_sectional(

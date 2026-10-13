@@ -23,7 +23,7 @@
 | `custodial_operator_control` | system_weakness | 2 | credible_report | `privileged_role_exceeds_function` |
 | `deployer_controls_price_and_settlement` | system_weakness | 1 | confirmed | `dex_deposits_exceed_slashable_stake`, `oracle_setter_holds_position` |
 | `discretionary_crisis_settlement` | system_weakness | 1 | confirmed | - |
-| `exposure_exceeds_depth` | system_weakness | 6 | confirmed | `large_position_near_liquidation`, `oi_cap_exceeds_depth`, `open_interest_exceeds_depth` |
+| `exposure_exceeds_depth` | system_weakness | 6 | confirmed | `large_position_near_liquidation`, `oi_cap_exceeds_depth`, `open_interest_exceeds_depth`, `open_interest_growth_exceeds_depth` |
 | `liquidation_cheaper_than_market_exit` | system_weakness | 1 | credible_report | `large_position_near_liquidation` |
 | `liquidity_withdrawal_under_stress` | system_weakness | 1 | credible_report | - |
 | `missing_post_call_check` | system_weakness | 0 | - | - |
@@ -43,7 +43,7 @@
 | `delegated_scope` | 2 | `caller_controlled_external_call`, `privileged_role_exceeds_function` |
 | `exit_availability` | 1 | - |
 | `liquidation_not_cheaper_exit` | 1 | `large_position_near_liquidation` |
-| `loss_containment` | 4 | `backstop_position_exceeds_depth`, `funded_cluster_same_direction`, `large_position_near_liquidation`, `linked_accounts_opposite_positions`, `liquidator_loss_near_capacity`, `oi_cap_exceeds_depth`, `open_interest_exceeds_depth` |
+| `loss_containment` | 4 | `backstop_position_exceeds_depth`, `funded_cluster_same_direction`, `large_position_near_liquidation`, `linked_accounts_opposite_positions`, `liquidator_loss_near_capacity`, `oi_cap_exceeds_depth`, `open_interest_exceeds_depth`, `open_interest_growth_exceeds_depth` |
 | `operator_bond_covers_abuse` | 1 | `dex_deposits_exceed_slashable_stake`, `oracle_setter_holds_position`, `privileged_role_exceeds_function` |
 | `price_integrity` | 6 | `funded_cluster_same_direction`, `large_order_pulled_before_move`, `mark_diverges_from_oracle`, `mark_jump_short_window` |
 | `rule_stability` | 1 | - |

@@ -92,6 +92,11 @@ hyperliquid-security calibrate --passes passes.jsonl --candles candles_5m.json \
   --anchors knowledge/calibration/data/anchor_moves.json
 ```
 
+An uncalibrated threshold still states its base rate on committed data where
+data exists: `calibration.base_rate(kb, rule_id, samples)` evaluates the rule as
+written on recorded samples, and a test pins the numbers quoted in the note
+(see `test_growth_rule_base_rate_matches_its_notes`).
+
 Apply the printed values to the rule (`basis: calibrated`,
 `calibration: <id>`) and to profiles, and run `validate`. Never tune a
 threshold to make an anchor fire; calibrate on the target, then report whether

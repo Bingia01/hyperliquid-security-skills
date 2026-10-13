@@ -1,0 +1,17 @@
+{
+  "observed_at": "2026-10-13T12:37:55Z",
+  "how": "clearinghouseState marginSummary.accountValue: summed over HLP's child vaults named 'HLP Liquidator*' for validator-operated perps (key 'core'); the dex backstop liquidator 0x4000...0000 + dex index for each HIP-3 dex",
+  "account_value_usd": {
+    "core": 32999998.574898,
+    "xyz": 103775.216029,
+    "flx": 262.965814,
+    "vntl": 0.0,
+    "hyna": 995.207807,
+    "km": 15600.647559,
+    "abcd": 0.0,
+    "cash": 0.0,
+    "para": 222.794434,
+    "mkts": 0.0,
+    "io": 0.0
+  }
+}

@@ -13,8 +13,15 @@ hyperliquid-security snapshot --coin SOMEHYPERP --surface hyperps -o /tmp/h.json
 hyperliquid-security evaluate /tmp/eth.json
 ```
 
-For the five-minute mark move, take a second snapshot four to six minutes
-later with `--previous /tmp/eth.json`.
+History features compare with earlier snapshots of the same market, passed
+with `--previous` (repeatable): the five-minute mark move needs one taken four
+to six minutes earlier, open interest growth one taken 55 to 65 minutes
+earlier. Keep each snapshot file; each feature picks the one whose age fits.
+
+```bash
+hyperliquid-security snapshot --coin ETH --previous /tmp/eth-1h.json \
+  --previous /tmp/eth-5m.json -o /tmp/eth.json
+```
 
 ## Reading the results
 

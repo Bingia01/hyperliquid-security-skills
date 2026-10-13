@@ -145,22 +145,57 @@ def test_failed_group_is_marked_absent() -> None:
     assert "market.bid_depth_usd_2pct" in snapshot["values"]
 
 
+def earlier_snapshot(minutes: float, **values: float) -> dict[str, Any]:
+    return {
+        "subject": "TEST",
+        "observed_at": (NOW - dt.timedelta(minutes=minutes)).isoformat(),
+        "values": values,
+    }
+
+
 def test_mark_history_requires_a_window() -> None:
     api = FakeApi({None: full_book(100.0, 5, 0.1)})
     client = InfoClient(transport=api)
-    earlier = {
-        "subject": "TEST",
-        "observed_at": (NOW - dt.timedelta(minutes=5)).isoformat(),
-        "values": {"market.mark_price": 80.0},
-    }
-    stale = dict(earlier, observed_at=(NOW - dt.timedelta(hours=1)).isoformat())
-    assert build_market_snapshot(client, "TEST", previous=earlier, now=lambda: NOW)["values"][
+    recent = earlier_snapshot(5, **{"market.mark_price": 80.0})
+    stale = earlier_snapshot(60, **{"market.mark_price": 80.0})
+    assert build_market_snapshot(client, "TEST", previous=[recent], now=lambda: NOW)["values"][
         "market.mark_move_bps_5m"
     ] == pytest.approx(2500.0)
-    assert (
-        "market.mark_move_bps_5m"
-        not in build_market_snapshot(client, "TEST", previous=stale, now=lambda: NOW)["values"]
+    snapshot = build_market_snapshot(client, "TEST", previous=[stale], now=lambda: NOW)
+    assert "market.mark_move_bps_5m" not in snapshot["values"]
+    assert "3600s" in snapshot["provenance"]["market.mark_move_bps_5m"]
+
+
+def test_open_interest_growth_uses_coin_units_at_the_current_mark() -> None:
+    api = FakeApi({None: full_book(100.0, 5, 0.1)})  # 1000 coins at mark 100 now
+    client = InfoClient(transport=api)
+    hour_ago = earlier_snapshot(
+        60, **{"market.open_interest_base_asset": 800.0, "market.mark_price": 50.0}
     )
+    recent = earlier_snapshot(5, **{"market.mark_price": 80.0})
+    other_market = dict(hour_ago, subject="OTHER")
+    snapshot = build_market_snapshot(
+        client, "TEST", previous=[other_market, recent, hour_ago], now=lambda: NOW
+    )
+    values = snapshot["values"]
+    assert values["market.open_interest_base_asset"] == 1000.0
+    # 200 new coins valued at the current mark; the price doubling since is not growth.
+    assert values["market.open_interest_change_usd_1h"] == pytest.approx(20_000.0)
+    assert values["market.mark_move_bps_5m"] == pytest.approx(2500.0)  # each picks its own
+
+
+def test_open_interest_growth_needs_the_earlier_coin_count() -> None:
+    api = FakeApi({None: full_book(100.0, 5, 0.1)})
+    client = InfoClient(transport=api)
+    for previous, reason in (
+        ([], "no earlier snapshot supplied"),
+        ([dict(earlier_snapshot(60), subject="OTHER")], "no earlier snapshot of this market"),
+        ([earlier_snapshot(60, **{"market.open_interest_usd": 80_000.0})], "with market.open_"),
+        ([earlier_snapshot(30, **{"market.open_interest_base_asset": 800.0})], "1800s"),
+    ):
+        snapshot = build_market_snapshot(client, "TEST", previous=previous, now=lambda: NOW)
+        assert "market.open_interest_change_usd_1h" not in snapshot["values"]
+        assert reason in snapshot["provenance"]["market.open_interest_change_usd_1h"]
 
 
 def test_hip3_backstop_address() -> None:
