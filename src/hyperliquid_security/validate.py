@@ -27,6 +27,7 @@ from .model import (
     FixtureProvenance,
     Mode,
     MoviePhase,
+    Profile,
     SourceType,
     condition_leaves,
 )
@@ -59,6 +60,7 @@ def validate(kb: KnowledgeBase) -> list[Problem]:
     _check_incidents(kb, out, tiers)
     compiled = _check_rules(kb, out, tiers)
     _check_profiles(kb, out, compiled)
+    _check_calibrations(kb, out)
     return out.problems
 
 
@@ -278,8 +280,11 @@ def _check_fixtures(kb: KnowledgeBase, out: _Collector, compiled: CompiledRule) 
                 bad = True
         if bad:
             continue
+        # Fixtures run with the surface's profile, as live evaluation does, so a
+        # profile override cannot silently stop a rule detecting its anchors.
+        profile = profile_for(kb, fixture.surface)
         try:
-            result = evaluate_rule(compiled, fixture.values, fixture.surface)
+            result = evaluate_rule(compiled, fixture.values, fixture.surface, profile)
         except EvaluationError as exc:
             out.error(label, f"evaluation error: {exc}")
             continue
@@ -318,6 +323,66 @@ def _check_profiles(kb: KnowledgeBase, out: _Collector, compiled: dict[str, Comp
             unknown = sorted(set(overrides) - set(rule.thresholds))
             if unknown:
                 out.error(where, f"rule {rule_id} has no thresholds named {unknown}")
+
+
+def profile_for(kb: KnowledgeBase, surface: str) -> Profile | None:
+    return next((p for p in kb.profiles.values() if p.surface == surface), None)
+
+
+def _check_calibrations(kb: KnowledgeBase, out: _Collector) -> None:
+    # Every calibrated threshold names a result that computed exactly its value.
+    for rule in kb.rules.values():
+        where = _loc(kb, "rules", rule.id)
+        for name, threshold in rule.thresholds.items():
+            if threshold.calibration is None:
+                continue
+            result = kb.calibrations.get(threshold.calibration)
+            if result is None:
+                out.error(
+                    where, f"threshold {name} cites unknown calibration {threshold.calibration!r}"
+                )
+                continue
+            matches = [
+                t
+                for t in result.targets
+                if t.rule == rule.id and t.threshold == name and t.applies_as == "rule_default"
+            ]
+            if not matches:
+                out.error(where, f"calibration {result.id} has no rule_default target for {name}")
+            elif matches[0].value != threshold.value:
+                out.error(
+                    where,
+                    f"threshold {name} is {threshold.value} but calibration {result.id} "
+                    f"computed {matches[0].value}",
+                )
+    # Every target in a result is applied where it says.
+    for result in kb.calibrations.values():
+        where = _loc(kb, "calibrations", result.id)
+        for target in result.targets:
+            target_rule = kb.rules.get(target.rule)
+            if target_rule is None or target.threshold not in target_rule.thresholds:
+                out.error(where, f"target {target.rule}.{target.threshold} does not exist")
+                continue
+            if target.surface not in target_rule.applies_to:
+                out.error(where, f"rule {target_rule.id} does not run on {target.surface}")
+            if target.applies_as == "rule_default":
+                threshold = target_rule.thresholds[target.threshold]
+                if threshold.calibration != result.id:
+                    out.error(
+                        where,
+                        f"{target_rule.id}.{target.threshold} does not cite this calibration",
+                    )
+            else:
+                profile = profile_for(kb, target.surface)
+                applied = (profile.overrides.get(target_rule.id, {}) if profile else {}).get(
+                    target.threshold
+                )
+                if applied != target.value:
+                    out.error(
+                        where,
+                        f"profile for {target.surface} sets {target_rule.id}.{target.threshold} to "
+                        f"{applied}, calibration computed {target.value}",
+                    )
 
 
 def validate_snapshot_values(kb: KnowledgeBase, values: dict[str, object]) -> list[str]:

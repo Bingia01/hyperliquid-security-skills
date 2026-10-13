@@ -137,6 +137,53 @@ def command_snapshot(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_record(args: argparse.Namespace) -> int:
+    from .hyperliquid_api import InfoClient
+    from .recording import MeteredClient, RateLimiter, record, record_candle_moves
+
+    client = MeteredClient(InfoClient(base_url=args.api), RateLimiter(args.weight_per_minute))
+    if args.candles:
+        record_candle_moves(client, Path(args.out), interval=args.candle_interval)
+    else:
+        record(client, Path(args.out), passes=args.passes, interval_seconds=args.interval_seconds)
+    return 0
+
+
+def command_calibrate(args: argparse.Namespace) -> int:
+    import datetime as dt
+
+    import yaml
+
+    from .calibration import (
+        calibrate_cross_sections,
+        calibrate_mark_moves,
+        load_passes,
+    )
+
+    kb = _load_or_exit(args.root)
+    computed = dt.date.fromisoformat(args.computed) if args.computed else dt.date.today()
+    results = []
+    if args.passes:
+        results += calibrate_cross_sections(kb, load_passes(Path(args.passes)), computed)
+    if args.candles:
+        anchors = (
+            json.loads(Path(args.anchors).read_text(encoding="utf-8")) if args.anchors else None
+        )
+        results.append(calibrate_mark_moves(Path(args.candles), computed, anchors))
+    out_dir = args.root / "calibration"
+    out_dir.mkdir(exist_ok=True)
+    for result in results:
+        path = out_dir / f"{result['id']}.yaml"
+        path.write_text(yaml.safe_dump(result, sort_keys=False, width=100), encoding="utf-8")
+        targets = ", ".join(
+            f"{t['rule']}.{t['threshold']}[{t['surface']}]={t['value']}" for t in result["targets"]
+        )
+        print(f"wrote {path}: {targets}")
+    print("Apply the values to rules (basis: calibrated, calibration: <id>) and profiles,")
+    print("then run `hyperliquid-security validate`, which checks they match.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="hyperliquid-security", description=__doc__)
     parser.add_argument("--root", type=Path, default=DEFAULT_ROOT, help="knowledge base directory")
@@ -169,6 +216,25 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--api", default="https://api.hyperliquid.xyz/info")
     p.add_argument("-o", "--output")
     p.set_defaults(func=command_snapshot)
+
+    p = commands.add_parser(
+        "record", help="record calibration samples from the live public API (read-only)"
+    )
+    p.add_argument("--out", required=True, help="JSON lines file (appended) or JSON for --candles")
+    p.add_argument("--passes", type=int, default=1)
+    p.add_argument("--interval-seconds", type=float, default=600.0)
+    p.add_argument("--candles", action="store_true", help="record candle moves instead of passes")
+    p.add_argument("--candle-interval", default="5m")
+    p.add_argument("--weight-per-minute", type=int, default=600, help="of the 1200 per-IP budget")
+    p.add_argument("--api", default="https://api.hyperliquid.xyz/info")
+    p.set_defaults(func=command_record)
+
+    p = commands.add_parser("calibrate", help="compute thresholds from recorded data")
+    p.add_argument("--passes", help="JSON lines from `record`")
+    p.add_argument("--candles", help="JSON from `record --candles`")
+    p.add_argument("--anchors", help="JSON {name: {surface, basis, moves_bps}} to check")
+    p.add_argument("--computed", help="date to stamp on results (default today)")
+    p.set_defaults(func=command_calibrate)
     return parser
 
 

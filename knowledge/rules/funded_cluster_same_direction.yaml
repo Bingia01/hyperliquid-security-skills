@@ -27,7 +27,7 @@ thresholds:
   max_cluster_to_depth:
     value: 1.0
     unit: ratio
-    basis: placeholder
+    basis: definitional
 condition:
   all:
     - cluster.shared_funding_source

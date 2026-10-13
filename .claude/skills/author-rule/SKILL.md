@@ -69,21 +69,35 @@ shown to do.
 - `alert` rules document at least two false-positive scenarios; `report`
   rules at least one.
 
-## Calibration before trusting a threshold
+## Calibrating a threshold
 
-Placeholders are guesses. Before treating a rule as meaningful, look at the
-distribution across normal markets:
+A threshold's `basis` says where it comes from: `placeholder` (judgment),
+`definitional` (follows from the ratio's meaning, e.g. 1.0 = cannot exit
+within the band), `incident_reconstruction`, or `calibrated`. A calibrated
+threshold names the result in `knowledge/calibration/` that computed it, and
+the validator checks the value matches.
+
+Decide the **target** before touching data:
+- precondition rules: a cross-sectional rank ("the most exposed tenth of
+  markets") on each market's median ratio;
+- alert rules: an alert budget (episodes per day across a surface), because a
+  pager tolerates a fixed number of interruptions.
+
+Then record and compute:
 
 ```bash
-hyperliquid-security snapshot --coin BTC -o /tmp/btc.json
-hyperliquid-security evaluate /tmp/btc.json --rule <id>
+hyperliquid-security record --out passes.jsonl --passes 12 --interval-seconds 600
+hyperliquid-security record --candles --out candles_5m.json
+hyperliquid-security calibrate --passes passes.jsonl --candles candles_5m.json \
+  --anchors knowledge/calibration/data/anchor_moves.json
 ```
 
-On 2026-10-12, open interest over the thinner side's 2% depth ranged from
-about 12 (xyz:NVDA) to 141 (HYPE) across healthy markets - a single
-cross-market threshold on that ratio cannot separate attack from normal.
-Rare events plus frequent evaluation means even a 0.1% false-positive rate
-buries every true alert; calibrate on archived data before paging anyone.
+Apply the printed values to the rule (`basis: calibrated`,
+`calibration: <id>`) and to profiles, and run `validate`. Never tune a
+threshold to make an anchor fire; calibrate on the target, then report whether
+anchors fire as a check. Archived order books hold 20 full-precision levels,
+which never reach a 2% band on liquid markets - depth-based calibration needs
+live recording with `nSigFigs` aggregation.
 
 ## Finish
 

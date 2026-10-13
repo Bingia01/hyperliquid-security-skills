@@ -1,0 +1,229 @@
+import copy
+import datetime as dt
+import json
+import statistics
+from pathlib import Path
+from typing import Any
+
+import pytest
+from hypothesis import given
+from hypothesis import strategies as st
+
+from hyperliquid_security.calibration import (
+    budget_threshold,
+    calibrate_mark_moves,
+    cross_sectional,
+    episode_counter,
+    episodes,
+    quantile,
+)
+from hyperliquid_security.hyperliquid_api import InfoClient
+from hyperliquid_security.knowledge_base import KnowledgeBase
+from hyperliquid_security.model import CalibrationResult, Threshold, ThresholdBasis
+from hyperliquid_security.recording import (
+    MeteredClient,
+    RateLimiter,
+    candle_moves_bps,
+    record_pass,
+)
+from hyperliquid_security.validate import validate
+
+series_strategy = st.dictionaries(
+    st.sampled_from(["a", "b", "c"]),
+    st.lists(st.integers(min_value=0, max_value=20).map(float), max_size=30),
+    min_size=1,
+)
+
+
+def test_quantile_matches_inclusive_definition() -> None:
+    data = [3.0, 1.0, 4.0, 1.0, 5.0, 9.0, 2.0, 6.0]
+    expected = statistics.quantiles(data, n=10, method="inclusive")
+    assert [round(quantile(data, k / 10), 9) for k in range(1, 10)] == [
+        round(v, 9) for v in expected
+    ]
+    with pytest.raises(ValueError):
+        quantile([], 0.5)
+
+
+@given(series_strategy, st.integers(min_value=0, max_value=21).map(float))
+def test_episode_counter_equals_brute_force(series: dict[str, list[float]], t: float) -> None:
+    assert episode_counter(series)(t) == sum(episodes(s, t) for s in series.values())
+
+
+@given(series_strategy, st.integers(min_value=1, max_value=6))
+def test_budget_threshold_is_lowest_stable_threshold(
+    series: dict[str, list[float]], allowed: int
+) -> None:
+    count = episode_counter(series)
+    threshold, used = budget_threshold(series, allowed)
+    candidates = sorted({v for s in series.values() for v in s})
+    if not candidates:
+        return
+    assert used == count(threshold) <= allowed
+    assert all(count(c) <= allowed for c in candidates if c >= threshold)
+    lower = [c for c in candidates if c < threshold]
+    if lower:
+        assert count(lower[-1]) > allowed
+
+
+def test_episodes_are_not_monotone_in_threshold() -> None:
+    # Lowering the threshold can merge runs: the reason for the descending scan.
+    assert episodes([5.0, 3.0, 5.0], 5.0) == 2
+    assert episodes([5.0, 3.0, 5.0], 3.0) == 1
+
+
+def test_candle_moves_skip_gaps() -> None:
+    step = 300_000
+    candles = [
+        {"t": 0, "T": step - 1, "c": "100"},
+        {"t": step, "T": 2 * step - 1, "c": "110"},
+        {"t": 3 * step, "T": 4 * step - 1, "c": "50"},  # one candle missing before this
+    ]
+    assert candle_moves_bps(candles) == [pytest.approx(1000.0)]
+
+
+def test_rate_limiter_waits_for_the_window() -> None:
+    now = [0.0]
+    slept: list[float] = []
+
+    def sleep(seconds: float) -> None:
+        slept.append(seconds)
+        now[0] += seconds
+
+    limiter = RateLimiter(10, clock=lambda: now[0], sleep=sleep)
+    limiter.acquire(6)
+    limiter.acquire(4)
+    limiter.acquire(5)  # would exceed 10 within the minute
+    assert slept and now[0] >= 60.0
+
+
+def test_record_pass_rows(repo_kb: KnowledgeBase) -> None:
+    def api(payload: dict[str, Any]) -> Any:
+        kind = payload["type"]
+        if kind == "perpDexs":
+            return [None, {"name": "dx", "assetToStreamingOiCap": [["dx:AAA", "5000000.0"]]}]
+        if kind == "metaAndAssetCtxs":
+            name = "dx:AAA" if payload.get("dex") == "dx" else "BBB"
+            return [
+                {
+                    "universe": [
+                        {"name": name, "maxLeverage": 5},
+                        {"name": "OLD", "isDelisted": True},
+                    ]
+                },
+                [
+                    {"markPx": "10", "oraclePx": "10", "openInterest": "100", "dayNtlVlm": "1"},
+                    {"markPx": "1", "oraclePx": "1", "openInterest": "0"},
+                ],
+            ]
+        if kind == "l2Book":
+            return {"levels": [[{"px": "9.9", "sz": "10"}], [{"px": "10.1", "sz": "10"}]]}
+        raise AssertionError(payload)
+
+    client = MeteredClient(InfoClient(transport=api), RateLimiter(10_000))
+    rows = list(record_pass(client, now=lambda: dt.datetime(2026, 10, 13, tzinfo=dt.UTC)))
+    assert [(r["coin"], r["surface"], r["oi_cap_usd"]) for r in rows] == [
+        ("BBB", "core_perps", None),
+        ("dx:AAA", "hip3_perps", 5_000_000.0),
+    ]
+    assert rows[0]["open_interest_usd"] == 1000.0
+    assert rows[0]["bid_depth_usd_2pct"] == pytest.approx(99.0)
+
+
+def test_cross_sectional_uses_the_rules_own_ratio(repo_kb: KnowledgeBase) -> None:
+    rows = []
+    for coin, oi in (("A", 10.0), ("B", 20.0), ("C", 30.0), ("D", 40.0)):
+        for _ in range(3):
+            rows.append(
+                {
+                    "coin": coin,
+                    "surface": "core_perps",
+                    "open_interest_usd": oi,
+                    "bid_depth_usd_2pct": 1.0,
+                    "ask_depth_usd_2pct": 2.0,
+                }
+            )
+    rows.append(
+        {
+            "coin": "E",
+            "surface": "core_perps",
+            "open_interest_usd": 99.0,
+            "bid_depth_usd_2pct": None,
+            "ask_depth_usd_2pct": 1.0,
+        }
+    )
+    result = cross_sectional(
+        repo_kb, "open_interest_exceeds_depth", "oi_to_thinner_side_depth", rows, "core_perps", 0.5
+    )
+    assert result["markets"] == 4  # E had no measurable depth
+    assert result["value"] == 25.0
+    assert [m["market"] for m in result["above_threshold"]] == ["D", "C"]
+
+
+def test_mark_move_calibration_checks_anchors(tmp_path: Path) -> None:
+    moves = {f"M{i}": [10.0] * 200 + [float(100 * i)] + [10.0] * 200 for i in range(1, 6)}
+    data = {
+        "interval": "5m",
+        "markets": {
+            coin: {"surface": "core_perps", "first": 0, "last": 86_400_000, "moves_bps": m}
+            for coin, m in moves.items()
+        },
+    }
+    data["markets"]["H1"] = {
+        "surface": "hip3_perps",
+        "first": 0,
+        "last": 86_400_000,
+        "moves_bps": [5.0, 900.0, 5.0],
+    }
+    path = tmp_path / "candles.json"
+    path.write_text(json.dumps(data))
+    anchors = {
+        "big": {"surface": "core_perps", "basis": "test", "moves_bps": [2000.0]},
+        "small": {"surface": "core_perps", "basis": "test", "moves_bps": [50.0]},
+    }
+    result = calibrate_mark_moves(path, dt.date(2026, 10, 13), anchors)
+    core = result["results"]["core_perps"]
+    assert core["episodes_allowed"] == 1 and core["value"] == 500.0
+    assert [c["outcome"].split()[0] for c in result["checks"]] == ["fires", "does"]
+
+
+def _with_calibration(kb: KnowledgeBase, value_in_rule: float, value_in_result: float) -> list[str]:
+    mutated = copy.copy(kb)
+    rule = kb.rules["oi_cap_exceeds_depth"]
+    threshold = Threshold(
+        value=value_in_rule, unit="ratio", basis=ThresholdBasis.calibrated, calibration="test_cal"
+    )
+    mutated.rules = {
+        **kb.rules,
+        rule.id: rule.model_copy(update={"thresholds": {"max_cap_to_depth": threshold}}),
+    }
+    mutated.calibrations = {
+        "test_cal": CalibrationResult(
+            id="test_cal",
+            computed=dt.date(2026, 10, 13),
+            method="m",
+            data="d",
+            targets=[
+                {
+                    "rule": rule.id,
+                    "threshold": "max_cap_to_depth",
+                    "surface": "hip3_perps",
+                    "applies_as": "rule_default",
+                    "value": value_in_result,
+                }
+            ],
+        )
+    }
+    return [p.message for p in validate(mutated) if p.level == "error"]
+
+
+def test_calibrated_threshold_must_match_its_result(repo_kb: KnowledgeBase) -> None:
+    assert not [e for e in _with_calibration(repo_kb, 144.0, 144.0) if "calibration" in e]
+    assert any("computed 150.0" in e for e in _with_calibration(repo_kb, 144.0, 150.0))
+
+
+def test_calibrated_basis_requires_a_result_id() -> None:
+    with pytest.raises(ValueError, match="names its calibration"):
+        Threshold(value=1.0, unit="ratio", basis=ThresholdBasis.calibrated)
+    with pytest.raises(ValueError, match="names its calibration"):
+        Threshold(value=1.0, unit="ratio", basis=ThresholdBasis.placeholder, calibration="x")

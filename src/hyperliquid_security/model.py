@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 from enum import StrEnum
-from typing import Annotated, Any, Union
+from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -314,14 +314,19 @@ class Severity(StrEnum):
 
 class ThresholdBasis(StrEnum):
     placeholder = "placeholder"  # chosen by judgment; not calibrated on data
+    definitional = "definitional"  # follows from what the ratio means (e.g. 1.0 = cannot exit)
     incident_reconstruction = "incident_reconstruction"
-    calibrated = "calibrated"  # fitted on historical data with a stated method
+    calibrated = "calibrated"  # computed from recorded data; see `calibration`
 
 
 class Threshold(Record):
     value: float
     unit: str
     basis: ThresholdBasis
+    calibration: str | None = Field(
+        default=None,
+        description="For basis 'calibrated': the calibration result id in knowledge/calibration/.",
+    )
     note: str = ""
 
     @field_validator("unit")
@@ -329,6 +334,38 @@ class Threshold(Record):
     def _unit(cls, value: str) -> str:
         _parse_unit(value)
         return value
+
+    @model_validator(mode="after")
+    def _calibration(self) -> Threshold:
+        if (self.basis is ThresholdBasis.calibrated) != (self.calibration is not None):
+            raise ValueError("a 'calibrated' threshold names its calibration result, and only then")
+        return self
+
+
+class CalibrationTarget(Record):
+    rule: Identifier
+    threshold: Identifier
+    surface: Identifier
+    applies_as: Literal["rule_default", "profile_override"]
+    value: float
+
+
+class CalibrationCheck(Record):
+    description: NonEmpty
+    outcome: NonEmpty
+
+
+class CalibrationResult(Record):
+    """Output of `hyperliquid-security calibrate`; thresholds cite it by id."""
+
+    id: Identifier
+    computed: dt.date
+    method: NonEmpty
+    data: NonEmpty
+    limitations: list[str] = Field(default_factory=list)
+    targets: list[CalibrationTarget] = Field(min_length=1)
+    checks: list[CalibrationCheck] = Field(default_factory=list)
+    results: dict[str, Any] = Field(default_factory=dict)
 
 
 Condition = Union[str, "AllOf", "AnyOf", "NotOf"]

@@ -59,6 +59,9 @@
       l2Book, retried with nSigFigs 5, 4, 3, 2 until the returned levels reach
       past the band or the side has fewer than 20 levels; sum px x sz within
       the band. Bucketed levels make the band edge accurate to one bucket.
+      Archived books (Hyperliquid's S3 archive, Tardis) store the 20-level
+      full-precision feed and cannot measure this band on liquid markets: on
+      2025-11-01 BTC's 20 levels spanned a median 1.8 bps and never reached 2%.
 
 - id: market.ask_depth_usd_2pct
   kind: number

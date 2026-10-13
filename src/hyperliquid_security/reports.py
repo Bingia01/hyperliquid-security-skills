@@ -240,10 +240,103 @@ def render_taxonomy(kb: KnowledgeBase) -> str:
     )
 
 
+def _calibrated_by(kb: KnowledgeBase, rule_id: str, threshold: str, surface: str) -> str | None:
+    for result in kb.calibrations.values():
+        for target in result.targets:
+            if (target.rule, target.threshold, target.surface, target.applies_as) == (
+                rule_id,
+                threshold,
+                surface,
+                "profile_override",
+            ):
+                return result.id
+    return None
+
+
+def render_calibration(kb: KnowledgeBase) -> str:
+    rows = []
+    for rule in sorted(kb.rules.values(), key=lambda r: r.id):
+        for name, threshold in sorted(rule.thresholds.items()):
+            rows.append(
+                [
+                    f"`{rule.id}`",
+                    f"`{name}`",
+                    "default",
+                    f"{threshold.value:g} {threshold.unit}",
+                    threshold.basis.value,
+                    f"`{threshold.calibration}`" if threshold.calibration else "-",
+                ]
+            )
+            for profile in sorted(kb.profiles.values(), key=lambda p: p.surface):
+                value = profile.overrides.get(rule.id, {}).get(name)
+                if value is None:
+                    continue
+                source = _calibrated_by(kb, rule.id, name, profile.surface)
+                rows.append(
+                    [
+                        f"`{rule.id}`",
+                        f"`{name}`",
+                        profile.surface,
+                        f"{value:g} {threshold.unit}",
+                        "calibrated" if source else "placeholder",
+                        f"`{source}`" if source else "-",
+                    ]
+                )
+    parts = [
+        HEADER,
+        "# Calibration\n\n",
+        "Where every threshold value comes from. *calibrated* values were computed by "
+        "`hyperliquid-security calibrate` from recorded data, and the validator checks the rule "
+        "or profile carries exactly the computed value. *definitional* values follow from what "
+        "the ratio means. *placeholder* values are judgment and should be read as such.\n\n",
+        _table(["Rule", "Threshold", "Surface", "Value", "Basis", "Calibration"], rows),
+    ]
+    for result in sorted(kb.calibrations.values(), key=lambda r: r.id):
+        parts.append(f"\n## `{result.id}` (computed {result.computed})\n\n")
+        parts.append(f"**Method.** {result.method}\n\n**Data.** {result.data}\n\n")
+        target_rows = [
+            [f"`{t.rule}`", f"`{t.threshold}`", t.surface, t.applies_as, f"{t.value:g}"]
+            for t in result.targets
+        ]
+        parts.append(_table(["Rule", "Threshold", "Surface", "Applied as", "Value"], target_rows))
+        if result.checks:
+            parts.append("\n**Checks against incidents.**\n\n")
+            parts.append("".join(f"- {c.description}: {c.outcome}\n" for c in result.checks))
+        if result.limitations:
+            parts.append("\n**Limitations.**\n\n")
+            parts.append("".join(f"- {item}\n" for item in result.limitations))
+        for surface, detail in sorted(result.results.items()):
+            if not isinstance(detail, dict):
+                continue
+            parts.append(f"\n**{surface}.** ")
+            summary = {
+                k: v
+                for k, v in detail.items()
+                if not isinstance(v, (list, dict)) and k != "surface"
+            }
+            parts.append(", ".join(f"{k}: {v}" for k, v in summary.items()) + "\n\n")
+            if isinstance(detail.get("quantiles"), dict):
+                quantiles = detail["quantiles"]
+                parts.append(_table(list(quantiles), [[str(v) for v in quantiles.values()]]))
+            listed = detail.get("above_threshold") or detail.get("episodes_by_market") or []
+            if listed:
+                label = (
+                    "At or above threshold" if "above_threshold" in detail else "Episodes by market"
+                )
+                shown = ", ".join(
+                    f"{item['market']} ({item.get('median', item.get('episodes'))})"
+                    for item in listed[:20]
+                )
+                more = f", and {len(listed) - 20} more" if len(listed) > 20 else ""
+                parts.append(f"\n{label}: {shown}{more}.\n")
+    return "".join(parts)
+
+
 def render_all(kb: KnowledgeBase) -> dict[str, str]:
     return {
         "incidents.md": render_incidents(kb),
         "rules.md": render_rules(kb),
         "coverage.md": render_coverage(kb),
         "taxonomy.md": render_taxonomy(kb),
+        "calibration.md": render_calibration(kb),
     }
