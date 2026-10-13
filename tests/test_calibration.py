@@ -209,6 +209,33 @@ def test_recording_session_resumes_and_packs(tmp_path: Path) -> None:
     assert len(list(session.glob("pass-*.jsonl.gz"))) == 6
 
 
+def test_recording_session_survives_a_failed_pass(tmp_path: Path) -> None:
+    from hyperliquid_security.recording import record_session
+
+    calls = {"perpDexs": 0}
+
+    def flaky(payload: dict[str, Any]) -> Any:
+        if payload["type"] == "perpDexs":
+            calls["perpDexs"] += 1
+            if calls["perpDexs"] == 2:
+                raise ApiError("perpDexs failed: Remote end closed connection without response")
+        return fake_market_api(payload)
+
+    clock = FakeClock()
+    client = MeteredClient(InfoClient(transport=flaky), RateLimiter(10_000))
+    messages: list[str] = []
+    complete = record_session(
+        client, tmp_path, 0.5, 600, now=clock.now, sleep=clock.sleep, log=messages.append
+    )
+    assert complete
+    files = sorted(tmp_path.glob("pass-*.jsonl.gz"))
+    assert len(files) == 2  # three attempts, one skipped
+    assert any("skipped" in m for m in messages)
+    from hyperliquid_security.calibration import load_passes
+
+    assert sorted({r["pass"] for r in load_passes(tmp_path)}) == [1, 2]
+
+
 def test_recording_session_refuses_another_api(tmp_path: Path) -> None:
     from hyperliquid_security.recording import record_session
 

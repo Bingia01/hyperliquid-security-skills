@@ -201,7 +201,7 @@ def record_session(
     stop_after_hours: float | None = None,
     now: Callable[[], dt.datetime] = _now,
     sleep: Callable[[float], None] = time.sleep,
-    log: Callable[[str], None] = print,
+    log: Callable[[str], None] = lambda message: print(message, flush=True),
 ) -> bool:
     """Record one pass every ``interval_seconds`` into ``directory`` for ``hours``.
 
@@ -248,16 +248,22 @@ def record_session(
         if wait > 0:
             sleep(wait)
         started = now()
-        number += 1
+        last_start = started
         lines = []
-        for row in record_pass(client, now):
-            row["pass"] = number
-            lines.append(json.dumps(row))
+        try:
+            for row in record_pass(client, now):
+                row["pass"] = number + 1
+                lines.append(json.dumps(row))
+        except REQUEST_ERRORS as exc:
+            # A request every pass depends on failed after its retries. Skip this pass
+            # rather than end the session: one outage should cost one pass, not a day.
+            log(f"pass at {started:%H:%M:%S} skipped: {exc}")
+            continue
+        number += 1
         path = directory / started.strftime(FILE_NAME_FORMAT)
         _write_atomically(path, gzip.compress(("\n".join(lines) + "\n").encode()))
         elapsed = (now() - started).total_seconds()
         log(f"pass {number}: {len(lines)} rows in {elapsed:.0f}s -> {path.name}")
-        last_start = started
     complete = now() >= ends_at or (last_start is not None and last_start + interval >= ends_at)
     log(f"{number} passes recorded; session {'complete' if complete else 'continues on rerun'}")
     return complete

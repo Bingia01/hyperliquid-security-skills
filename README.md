@@ -17,7 +17,7 @@ markets, HyperEVM applications and user accounts.
 Read [docs/DESIGN.md](docs/DESIGN.md) for the reasoning, assumptions and
 constraints, and for what changed from v1/v2 and why.
 
-## Status at v3.3.0, stated plainly
+## Status at v3.3.1, stated plainly
 
 Live numbers are in the generated reports; these describe the release.
 

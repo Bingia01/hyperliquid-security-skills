@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hyperliquid-security"
-version = "3.3.0"
+version = "3.3.1"
 description = "Evidence-checked knowledge base and rule engine for Hyperliquid-class security incidents"
 readme = "README.md"
 license = "MIT"

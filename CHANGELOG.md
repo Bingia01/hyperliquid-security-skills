@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.3.1
+
+- **Recorder survives network failures.** The info client now retries dropped
+  connections (`http.client.RemoteDisconnected`, resets, other `OSError`s) like
+  a 5xx; before, one dropped connection ended a recording session (it did, on
+  2026-10-13 at 14:57 UTC, after two hours). A pass whose shared requests still
+  fail after retries is skipped and the session continues. Log lines are
+  flushed as written.
+- **`record` workflow keeps partial segments.** The recording step has its own
+  time limit, and a segment's passes are uploaded even when recording fails or
+  times out.
+
 ## v3.3.0
 
 - **Recording sessions.** `record --out-dir DIR --hours H` writes one gzipped
