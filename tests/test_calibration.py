@@ -18,7 +18,7 @@ from hyperliquid_security.calibration import (
     episodes,
     quantile,
 )
-from hyperliquid_security.hyperliquid_api import InfoClient
+from hyperliquid_security.hyperliquid_api import HLP_PARENT, ApiError, InfoClient
 from hyperliquid_security.knowledge_base import KnowledgeBase
 from hyperliquid_security.model import CalibrationResult, Threshold, ThresholdBasis
 from hyperliquid_security.recording import (
@@ -100,30 +100,40 @@ def test_rate_limiter_waits_for_the_window() -> None:
     assert slept and now[0] >= 60.0
 
 
-def test_record_pass_rows(repo_kb: KnowledgeBase) -> None:
-    def api(payload: dict[str, Any]) -> Any:
-        kind = payload["type"]
-        if kind == "perpDexs":
-            return [None, {"name": "dx", "assetToStreamingOiCap": [["dx:AAA", "5000000.0"]]}]
-        if kind == "metaAndAssetCtxs":
-            name = "dx:AAA" if payload.get("dex") == "dx" else "BBB"
-            return [
-                {
-                    "universe": [
-                        {"name": name, "maxLeverage": 5},
-                        {"name": "OLD", "isDelisted": True},
-                    ]
-                },
-                [
-                    {"markPx": "10", "oraclePx": "10", "openInterest": "100", "dayNtlVlm": "1"},
-                    {"markPx": "1", "oraclePx": "1", "openInterest": "0"},
-                ],
-            ]
-        if kind == "l2Book":
-            return {"levels": [[{"px": "9.9", "sz": "10"}], [{"px": "10.1", "sz": "10"}]]}
-        raise AssertionError(payload)
+def fake_market_api(payload: dict[str, Any]) -> Any:
+    """Two markets (one validator-operated, one on HIP-3 dex "dx"), two backstops."""
+    kind = payload["type"]
+    if kind == "perpDexs":
+        return [None, {"name": "dx", "assetToStreamingOiCap": [["dx:AAA", "5000000.0"]]}]
+    if kind == "metaAndAssetCtxs":
+        name = "dx:AAA" if payload.get("dex") == "dx" else "BBB"
+        return [
+            {
+                "universe": [
+                    {"name": name, "maxLeverage": 5},
+                    {"name": "OLD", "isDelisted": True},
+                ]
+            },
+            [
+                {"markPx": "10", "oraclePx": "10", "openInterest": "100", "dayNtlVlm": "1"},
+                {"markPx": "1", "oraclePx": "1", "openInterest": "0"},
+            ],
+        ]
+    if kind == "l2Book":
+        return {"levels": [[{"px": "9.9", "sz": "10"}], [{"px": "10.1", "sz": "10"}]]}
+    if kind == "vaultDetails":
+        if payload["vaultAddress"] == HLP_PARENT:
+            children = ["0x01", "0x02"]
+            return {"relationship": {"type": "parent", "data": {"childAddresses": children}}}
+        return {"name": "HLP Liquidator" if payload["vaultAddress"] == "0x01" else "HLP Strategy"}
+    if kind == "clearinghouseState":
+        value = "250.0" if payload.get("dex") == "dx" else "33000000.0"
+        return {"marginSummary": {"accountValue": value}, "assetPositions": []}
+    raise AssertionError(payload)
 
-    client = MeteredClient(InfoClient(transport=api), RateLimiter(10_000))
+
+def test_record_pass_rows(repo_kb: KnowledgeBase) -> None:
+    client = MeteredClient(InfoClient(transport=fake_market_api), RateLimiter(10_000))
     rows = list(record_pass(client, now=lambda: dt.datetime(2026, 10, 13, tzinfo=dt.UTC)))
     assert [(r["coin"], r["surface"], r["oi_cap_usd"]) for r in rows] == [
         ("BBB", "core_perps", None),
@@ -131,6 +141,86 @@ def test_record_pass_rows(repo_kb: KnowledgeBase) -> None:
     ]
     assert rows[0]["open_interest_usd"] == 1000.0
     assert rows[0]["bid_depth_usd_2pct"] == pytest.approx(99.0)
+    # Each market carries the capital of the backstop that would inherit its liquidations.
+    assert [r["backstop_account_value_usd"] for r in rows] == [33_000_000.0, 250.0]
+
+
+def test_unmeasured_backstop_is_absent_not_zero() -> None:
+    def broken(payload: dict[str, Any]) -> Any:
+        if payload["type"] == "clearinghouseState" and payload.get("dex") == "dx":
+            raise ApiError("clearinghouseState failed: 503")
+        return fake_market_api(payload)
+
+    client = MeteredClient(InfoClient(transport=broken), RateLimiter(10_000))
+    rows = list(record_pass(client))
+    assert [r["backstop_account_value_usd"] for r in rows] == [33_000_000.0, None]
+
+
+class FakeClock:
+    def __init__(self) -> None:
+        self.time = dt.datetime(2026, 10, 13, 12, 0, tzinfo=dt.UTC)
+
+    def now(self) -> dt.datetime:
+        self.time += dt.timedelta(seconds=30)  # each reading costs time, like a real pass
+        return self.time
+
+    def sleep(self, seconds: float) -> None:
+        self.time += dt.timedelta(seconds=seconds)
+
+
+def test_recording_session_resumes_and_packs(tmp_path: Path) -> None:
+    import gzip
+
+    from hyperliquid_security.calibration import load_passes
+    from hyperliquid_security.recording import pack, record_session
+
+    clock = FakeClock()
+    client = MeteredClient(InfoClient(transport=fake_market_api), RateLimiter(10_000))
+    session = tmp_path / "session"
+
+    def run(stop_after_hours: float | None) -> bool:
+        return record_session(
+            client,
+            session,
+            hours=1.0,
+            interval_seconds=600,
+            stop_after_hours=stop_after_hours,
+            now=clock.now,
+            sleep=clock.sleep,
+            log=lambda _: None,
+        )
+
+    assert run(stop_after_hours=0.3) is False  # stopped early; the session continues
+    first = sorted(p.name for p in session.glob("pass-*.jsonl.gz"))
+    assert len(first) == 2
+    assert run(stop_after_hours=None) is True  # same command resumes and completes
+    files = sorted(session.glob("pass-*.jsonl.gz"))
+    assert [p.name for p in files[:2]] == first
+    assert len(files) == 6  # one pass every 10 minutes for an hour
+    assert not list(session.glob("*.partial"))
+
+    packed = tmp_path / "passes.jsonl.gz"
+    assert pack(session, packed) == 12
+    rows = load_passes(packed)
+    assert [r["pass"] for r in rows] == [n for n in range(1, 7) for _ in range(2)]
+    with gzip.open(files[0], "rt") as handle:
+        assert len(handle.read().splitlines()) == 2
+    assert run(stop_after_hours=None) is True  # rerunning a finished session records nothing
+    assert len(list(session.glob("pass-*.jsonl.gz"))) == 6
+
+
+def test_recording_session_refuses_another_api(tmp_path: Path) -> None:
+    from hyperliquid_security.recording import record_session
+
+    clock = FakeClock()
+    client = MeteredClient(InfoClient(transport=fake_market_api), RateLimiter(10_000))
+    record_session(client, tmp_path, 0.1, 600, now=clock.now, sleep=clock.sleep, log=print)
+    other = MeteredClient(
+        InfoClient(base_url="https://api.hyperliquid-testnet.xyz/info", transport=fake_market_api),
+        RateLimiter(10_000),
+    )
+    with pytest.raises(ValueError, match="hyperliquid-testnet"):
+        record_session(other, tmp_path, 0.1, 600, now=clock.now, sleep=clock.sleep)
 
 
 def test_cross_sectional_uses_the_rules_own_ratio(repo_kb: KnowledgeBase) -> None:
@@ -309,18 +399,25 @@ def test_committed_calibrations_reproduce_from_committed_data(repo_kb: Knowledge
         assert [t.model_dump() for t in committed.targets] == result["targets"], result["id"]
 
 
-def pass_row(coin: str, minute: int, open_interest_usd: float, mark: float) -> dict[str, Any]:
+def pass_row(
+    coin: str,
+    minute: int,
+    open_interest_usd: float,
+    mark: float,
+    depth: float = 1.0e6,
+    surface: str = "core_perps",
+) -> dict[str, Any]:
+    start = dt.datetime(2026, 10, 13, 6, 0, tzinfo=dt.UTC)
     return {
-        "observed_at": (
-            dt.datetime(2026, 10, 13, 6, 0, tzinfo=dt.UTC) + dt.timedelta(minutes=minute)
-        ).isoformat(),
-        "dex": None,
+        "observed_at": (start + dt.timedelta(minutes=minute)).isoformat(),
+        "dex": "dx" if surface == "hip3_perps" else None,
         "coin": coin,
-        "surface": "core_perps",
+        "surface": surface,
+        "pass": minute // 10 + 1,
         "mark_price": mark,
         "open_interest_usd": open_interest_usd,
-        "bid_depth_usd_2pct": 1.0e6,
-        "ask_depth_usd_2pct": 1.0e6,
+        "bid_depth_usd_2pct": depth,
+        "ask_depth_usd_2pct": depth,
     }
 
 
@@ -329,46 +426,39 @@ def test_growth_samples_count_positions_not_price() -> None:
 
     rows = [
         pass_row("A", 0, 1.0e6, 1.0),
-        pass_row("A", 30, 1.5e6, 1.5),  # 30 minutes apart: outside the window
+        pass_row("A", 30, 1.5e6, 1.5),  # 30 minutes before the last pass: outside the window
         pass_row("A", 60, 2.0e6, 2.0),  # same coins, price doubled
         pass_row("B", 0, 1.0e6, 1.0),
+        pass_row("B", 4, 1.0e6, 1.0),  # 61 and 57 minutes before: the nearer to 60 is used
         pass_row("B", 61, 3.0e6, 1.0),  # two million new coins
     ]
-    samples = open_interest_growth_samples(rows, {"core": 33.0e6})
-    changes = {market: v["market.open_interest_change_usd_1h"] for _, market, v in samples}
+    samples = open_interest_growth_samples(rows)
+    changes = {s.market: s.values["market.open_interest_change_usd_1h"] for s in samples}
     assert changes == {"A": 0.0, "B": 2.0e6}
-    assert all(v["backstop.liquidator_account_value_usd"] == 33.0e6 for _, _, v in samples)
+    assert len(samples) == 2  # one sample per later pass, not one per pair
 
 
-def test_growth_rule_base_rate_matches_its_notes(repo_kb: KnowledgeBase) -> None:
-    """The base rate quoted in the rule's threshold note follows from committed data."""
-    from hyperliquid_security.calibration import (
-        base_rate,
-        load_passes,
-        open_interest_growth_samples,
-    )
-    from tests.conftest import KNOWLEDGE
+def test_growth_calibration_spends_the_budget_on_material_growth(repo_kb: KnowledgeBase) -> None:
+    from hyperliquid_security.calibration import calibrate_open_interest_growth
 
-    data = KNOWLEDGE / "calibration" / "data"
-    rows = load_passes(data / "passes_2026-10-13.jsonl.gz")
-    capital = json.loads((data / "backstop_capital_2026-10-13.json").read_text())
-    rule_id = "open_interest_growth_exceeds_depth"
-    rates = base_rate(
-        repo_kb, rule_id, open_interest_growth_samples(rows, capital["account_value_usd"])
-    )
-    core, hip3 = rates["core_perps"], rates["hip3_perps"]
-    assert core["firing"] == ["GRASS", "PONS", "TIA"]
-    assert len(hip3["firing"]) == 5
-    assert core["unknown"] == hip3["unknown"] == 0
+    def build(coin: str, growth: float, depth: float, surface: str = "core_perps") -> list[Any]:
+        return [
+            pass_row(coin, 0, 10.0e6, 1.0, depth, surface),
+            pass_row(coin, 60, 10.0e6 + growth, 1.0, depth, surface),
+        ]
 
-    # An empty backstop makes the capital condition hold for any growth, leaving depth alone.
-    depth_only = base_rate(repo_kb, rule_id, open_interest_growth_samples(rows, {"core": 0.0}))[
-        "core_perps"
+    rows = [
+        *build("BIG", 900.0e3, 300.0e3),  # 3x depth, material
+        *build("MID", 600.0e3, 300.0e3),  # 2x depth, material
+        *build("DUST", 16.0e3, 286.0),  # 56x depth, below min_growth_usd
+        *build("dx:CALM", 300.0e3, 1.0e6, "hip3_perps"),  # 0.3x depth
     ]
-    assert len(depth_only["firing"]) == 6
-    assert "PURR" in depth_only["firing"]
-
-    note = repo_kb.rules[rule_id].thresholds["max_growth_to_depth"].note
-    assert f"3 of {core['markets']} validator-operated markets (GRASS, PONS, TIA)" in note
-    assert f"5 of {hip3['markets']} HIP-3 markets" in note
-    assert "6\nvalidator-operated" in note or "6 validator-operated" in note
+    result = calibrate_open_interest_growth(repo_kb, rows, dt.date(2026, 10, 13))
+    core, hip3 = result["results"]["core_perps"], result["results"]["hip3_perps"]
+    assert core["episodes_allowed"] == 1
+    assert core["value"] == 3.0  # only BIG within a budget of one; DUST never counts
+    assert core["windows_below_min_growth"] == 1
+    assert [e["market"] for e in core["episodes_by_market"]] == ["BIG"]
+    assert hip3["value"] == 1.0  # the budget allows lower; the definitional floor holds
+    assert [t["value"] for t in result["targets"]] == [3.0, 1.0]
+    CalibrationResult.model_validate(result)

@@ -10,3 +10,6 @@ __pycache__/
 .ruff_cache/
 .hypothesis/
 snapshots/
+
+# Recording sessions in progress (pack them into knowledge/calibration/data/ to commit)
+recordings/

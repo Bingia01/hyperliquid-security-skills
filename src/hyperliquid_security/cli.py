@@ -135,16 +135,39 @@ def command_snapshot(args: argparse.Namespace) -> int:
     return 0
 
 
+RECORDING_UNFINISHED = 3
+
+
 def command_record(args: argparse.Namespace) -> int:
     from .hyperliquid_api import InfoClient
-    from .recording import MeteredClient, RateLimiter, record, record_candle_moves
+    from .recording import MeteredClient, RateLimiter, record_candle_moves, record_session
 
     client = MeteredClient(InfoClient(base_url=args.api), RateLimiter(args.weight_per_minute))
     if args.candles:
+        if not args.out:
+            print("--candles needs --out FILE", file=sys.stderr)
+            return 2
         record_candle_moves(client, Path(args.out), interval=args.candle_interval)
-    else:
-        record(client, Path(args.out), passes=args.passes, interval_seconds=args.interval_seconds)
-    return 0
+        return 0
+    if not args.out_dir:
+        print("recording passes needs --out-dir DIR", file=sys.stderr)
+        return 2
+    complete = record_session(
+        client,
+        Path(args.out_dir),
+        hours=args.hours,
+        interval_seconds=args.interval_seconds,
+        stop_after_hours=args.stop_after_hours,
+    )
+    return 0 if complete else RECORDING_UNFINISHED
+
+
+def command_pack(args: argparse.Namespace) -> int:
+    from .recording import pack
+
+    count = pack(Path(args.directory), Path(args.output))
+    print(f"wrote {count} rows to {args.output}")
+    return 0 if count else 1
 
 
 def command_calibrate(args: argparse.Namespace) -> int:
@@ -155,6 +178,7 @@ def command_calibrate(args: argparse.Namespace) -> int:
     from .calibration import (
         calibrate_cross_sections,
         calibrate_mark_moves,
+        calibrate_open_interest_growth,
         load_passes,
     )
 
@@ -167,7 +191,9 @@ def command_calibrate(args: argparse.Namespace) -> int:
             if args.archive_checks
             else None
         )
-        results += calibrate_cross_sections(kb, load_passes(Path(args.passes)), computed, archive)
+        rows = load_passes(Path(args.passes))
+        results += calibrate_cross_sections(kb, rows, computed, archive)
+        results.append(calibrate_open_interest_growth(kb, rows, computed))
     if args.candles:
         anchors = (
             json.loads(Path(args.anchors).read_text(encoding="utf-8")) if args.anchors else None
@@ -226,19 +252,38 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=command_snapshot)
 
     p = commands.add_parser(
-        "record", help="record calibration samples from the live public API (read-only)"
+        "record",
+        help="record calibration samples from the live public API (read-only)",
+        description=(
+            "Record one pass over every listed perp each interval into --out-dir, for --hours. "
+            "Rerunning with the same directory resumes the session. Exit status 0 means the "
+            f"session is complete, {RECORDING_UNFINISHED} that it stopped early (rerun to resume)."
+        ),
     )
-    p.add_argument("--out", required=True, help="JSON lines file (appended) or JSON for --candles")
-    p.add_argument("--passes", type=int, default=1)
+    p.add_argument("--out-dir", help="session directory (one file per pass, plus a manifest)")
+    p.add_argument("--hours", type=float, default=24.0, help="session length (new sessions)")
     p.add_argument("--interval-seconds", type=float, default=600.0)
+    p.add_argument(
+        "--stop-after-hours",
+        type=float,
+        help="end this run early, e.g. under a job time limit; the session resumes on rerun",
+    )
     p.add_argument("--candles", action="store_true", help="record candle moves instead of passes")
+    p.add_argument("--out", help="output JSON file for --candles")
     p.add_argument("--candle-interval", default="5m")
     p.add_argument("--weight-per-minute", type=int, default=600, help="of the 1200 per-IP budget")
     p.add_argument("--api", default="https://api.hyperliquid.xyz/info")
     p.set_defaults(func=command_record)
 
+    p = commands.add_parser(
+        "pack", help="merge a recording session's pass files into one .jsonl.gz to commit"
+    )
+    p.add_argument("directory")
+    p.add_argument("-o", "--output", required=True)
+    p.set_defaults(func=command_pack)
+
     p = commands.add_parser("calibrate", help="compute thresholds from recorded data")
-    p.add_argument("--passes", help="JSON lines from `record`")
+    p.add_argument("--passes", help="packed passes (.jsonl.gz) or a `record` session directory")
     p.add_argument("--candles", help="JSON from `record --candles`")
     p.add_argument("--anchors", help="JSON {name: {surface, basis, moves_bps}} to check")
     p.add_argument(

@@ -2,13 +2,13 @@ id: open_interest_growth_exceeds_depth
 title: Open interest built in the last hour exceeds what the book can absorb
 summary: >-
   New positions opened in the last hour, net of closes, exceed the resting depth
-  within 2% on the thinner side of the book, and are large relative to the
-  capital that would absorb a forced close. JELLY, POPCAT and FARTCOIN each
-  began with an actor opening positions far larger than the book; a level-based
-  exposure measure (open_interest_exceeds_depth) misses this when the market's
-  standing open interest was unremarkable until the day of the attack. The rule
-  reads the market total, so splitting the positions across many wallets does
-  not hide them.
+  within 2% on the thinner side of the book, and are large enough to matter.
+  JELLY, POPCAT and FARTCOIN each began with an actor opening positions far
+  larger than the book; a level-based exposure measure
+  (open_interest_exceeds_depth) misses this when the market's standing open
+  interest was unremarkable until the day of the attack. The rule reads the
+  market total, so splitting the positions across many wallets does not hide
+  them.
 stage: active_attack
 mode: report
 severity: high
@@ -19,7 +19,7 @@ action: >-
   HIP-3 deployer can lower the open interest cap or halt the market before the
   positions are pushed into liquidation.
 applies_to: [core_perps, hyperps, hip3_perps]
-scope: [market, backstop]
+scope: [market]
 detects: [exposure_exceeds_depth]
 protects: [loss_containment]
 anchors: [hl-2025-03-jelly, hl-2025-11-popcat, hl-2026-04-fartcoin]
@@ -30,33 +30,29 @@ thresholds:
     basis: definitional
     note: >-
       1.0 means the positions opened in the last hour alone could not be closed
-      within 2% even by taking all resting depth on the thinner side. Base rate
-      in the 2026-10-13 recording (one hour of comparisons, 06:24-08:21 UTC): with
-      both conditions, 3 of 178 validator-operated markets (GRASS, PONS, TIA) and
-      5 of 159 HIP-3 markets fired at least once; with this condition alone, 6
-      validator-operated markets did, mostly small ones such as PURR ($61k of new
-      positions against $12k of depth).
-  min_growth_to_backstop:
-    value: 0.01
-    unit: ratio
+      within 2% even by taking all resting depth on the thinner side.
+  min_growth_usd:
+    value: 250.0e3
+    unit: usd
     basis: placeholder
     note: >-
-      The new positions must also reach 1% of the backstop's capital - HLP's
-      liquidator vaults ($33.0M on 2026-10-13, so $330k), or a HIP-3 dex's
-      backstop liquidator. Every HIP-3 backstop held $0 to $104k that day, so on
-      HIP-3 this condition nearly always holds and the depth ratio decides: any
-      loss there passes straight to auto-deleveraging.
+      Materiality, not exposure: below this, even a total loss on the new
+      positions is small next to the cost of a person's attention. It is an
+      absolute amount on purpose, because that cost does not shrink with the
+      market. A share of the backstop's capital was tried first and failed on
+      HIP-3, where every dex's backstop held $0-$104k on 2026-10-13, so dust
+      markets (para:TTWO, $16k of growth against $286 of depth) consumed the
+      alert budget. On the 2026-10-13 two-hour recording, floors from $100k to
+      $250k flag the same markets.
 condition:
   all:
     - >-
       market.open_interest_change_usd_1h / min(market.bid_depth_usd_2pct, market.ask_depth_usd_2pct)
       >= threshold.max_growth_to_depth
-    - >-
-      market.open_interest_change_usd_1h / backstop.liquidator_account_value_usd
-      >= threshold.min_growth_to_backstop
+    - market.open_interest_change_usd_1h >= threshold.min_growth_usd
 report:
   growth_to_thinner_side_depth: market.open_interest_change_usd_1h / min(market.bid_depth_usd_2pct, market.ask_depth_usd_2pct)
-  growth_to_backstop_capital: market.open_interest_change_usd_1h / backstop.liquidator_account_value_usd
+  growth_usd: market.open_interest_change_usd_1h
 false_positives:
   - scenario: News or a listing elsewhere draws real two-sided interest faster than market makers deepen the book.
     distinguisher: Many unrelated accounts, depth rising over the following snapshots, and an external price move that explains the interest.
@@ -69,46 +65,45 @@ limitations:
   - A build-up spread over more than an hour can stay below the threshold in every window; open_interest_exceeds_depth catches it once the standing exposure is large.
   - No anchor's record states how long the build-up preceded the liquidation, so the lead time this rule gives is unmeasured.
   - Needs a snapshot of the same market taken 55 to 65 minutes earlier (`snapshot --previous`); without one the rule returns unknown.
-  - The threshold on depth is definitional and the one on backstop capital is a placeholder; neither is calibrated, and the recording behind the base rate covers two hours of one quiet day.
 fixtures:
   - name: an hour's new positions twice the thinner side fire
     expect: fires
     provenance: synthetic
     surface: core_perps
-    values: {market.open_interest_change_usd_1h: 2.0e6, market.bid_depth_usd_2pct: 1.5e6, market.ask_depth_usd_2pct: 1.0e6, backstop.liquidator_account_value_usd: 33.0e6}
+    values: {market.open_interest_change_usd_1h: 2.0e6, market.bid_depth_usd_2pct: 1.5e6, market.ask_depth_usd_2pct: 1.0e6}
   - name: growth a deep book absorbs is silent
     expect: silent
     provenance: synthetic
     surface: core_perps
-    values: {market.open_interest_change_usd_1h: 5.0e6, market.bid_depth_usd_2pct: 50.0e6, market.ask_depth_usd_2pct: 60.0e6, backstop.liquidator_account_value_usd: 33.0e6}
-  - name: growth too small to matter to the backstop is silent
+    values: {market.open_interest_change_usd_1h: 5.0e6, market.bid_depth_usd_2pct: 50.0e6, market.ask_depth_usd_2pct: 60.0e6}
+  - name: growth too small to matter is silent however thin the book
     expect: silent
     provenance: synthetic
-    surface: core_perps
-    values: {market.open_interest_change_usd_1h: 60.0e3, market.bid_depth_usd_2pct: 12.0e3, market.ask_depth_usd_2pct: 20.0e3, backstop.liquidator_account_value_usd: 33.0e6}
-    note: Five times the depth, but 0.2% of the backstop's capital.
+    surface: hip3_perps
+    values: {market.open_interest_change_usd_1h: 16.0e3, market.bid_depth_usd_2pct: 286.0, market.ask_depth_usd_2pct: 900.0}
+    note: Fifty-six times the depth, as on para:TTWO on 2026-10-13, but $16k.
   - name: exactly at both thresholds fires
     expect: fires
     provenance: synthetic
     surface: hyperps
-    values: {market.open_interest_change_usd_1h: 1.0e6, market.bid_depth_usd_2pct: 1.0e6, market.ask_depth_usd_2pct: 3.0e6, backstop.liquidator_account_value_usd: 100.0e6}
+    values: {market.open_interest_change_usd_1h: 250.0e3, market.bid_depth_usd_2pct: 250.0e3, market.ask_depth_usd_2pct: 1.0e6}
   - name: falling open interest is silent even with depth unmeasured
     expect: silent
     provenance: synthetic
     surface: core_perps
-    values: {market.open_interest_change_usd_1h: -3.0e6, backstop.liquidator_account_value_usd: 33.0e6}
-  - name: an empty HIP-3 backstop makes any unabsorbable growth material
-    expect: fires
+    values: {market.open_interest_change_usd_1h: -3.0e6}
+  - name: material growth with depth unmeasured is unknown
+    expect: unknown
     provenance: synthetic
     surface: hip3_perps
-    values: {market.open_interest_change_usd_1h: 20.0e3, market.bid_depth_usd_2pct: 5.0e3, market.ask_depth_usd_2pct: 8.0e3, backstop.liquidator_account_value_usd: 0.0}
+    values: {market.open_interest_change_usd_1h: 2.0e6, market.ask_depth_usd_2pct: 0.5e6}
   - name: no snapshot an hour earlier is unknown
     expect: unknown
     provenance: synthetic
     surface: core_perps
-    values: {market.bid_depth_usd_2pct: 1.0e6, market.ask_depth_usd_2pct: 1.0e6, backstop.liquidator_account_value_usd: 33.0e6}
+    values: {market.bid_depth_usd_2pct: 1.0e6, market.ask_depth_usd_2pct: 1.0e6}
   - name: outcome markets have no liquidations
     expect: not_applicable
     provenance: synthetic
     surface: hip4_outcomes
-    values: {market.open_interest_change_usd_1h: 2.0e6, market.bid_depth_usd_2pct: 0.1e6, market.ask_depth_usd_2pct: 0.1e6, backstop.liquidator_account_value_usd: 1.0e6}
+    values: {market.open_interest_change_usd_1h: 2.0e6, market.bid_depth_usd_2pct: 0.1e6, market.ask_depth_usd_2pct: 0.1e6}
