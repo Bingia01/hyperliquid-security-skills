@@ -17,7 +17,7 @@ markets, HyperEVM applications and user accounts.
 Read [docs/DESIGN.md](docs/DESIGN.md) for the reasoning, assumptions and
 constraints, and for what changed from v1/v2 and why.
 
-## Status at v3.2.0, stated plainly
+## Status at v3.3.0, stated plainly
 
 Live numbers are in the generated reports; these describe the release.
 
@@ -56,6 +56,12 @@ hyperliquid-security evaluate skhx.json           # HIP-3 profile applied automa
 # History features compare with earlier snapshots of the same market:
 # one 4-6 minutes old (mark move), one 55-65 minutes old (open interest growth).
 hyperliquid-security snapshot --coin ETH --previous eth-5m.json --previous eth-1h.json -o eth.json
+
+# Record a day of passes for calibration (rerun the same command to resume),
+# or run the `record` workflow on GitHub (Actions -> record -> Run workflow).
+hyperliquid-security record --out-dir recordings/day1 --hours 24
+hyperliquid-security pack recordings/day1 -o knowledge/calibration/data/passes_day1.jsonl.gz
+hyperliquid-security calibrate --passes knowledge/calibration/data/passes_day1.jsonl.gz
 ```
 
 Example (recorded 2026-10-12, see `examples/`): on HIP-3 market xyz:SKHX the

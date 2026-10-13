@@ -217,9 +217,9 @@ Ordered by value:
    compare; calibrate `mark_diverges_from_oracle` from continuous mark and
    oracle history (Tardis `derivative_ticker`); normalize price moves by each
    market's volatility so alerts spread across markets.
-2. **Calibrate the open-interest growth rule** (added in v3.2.0, see §9) to an
-   episode budget; that needs passes over at least a day, recording the
-   backstops' capital alongside, and a reconstruction of how fast JELLY's,
+2. **Calibrate the open-interest growth rule** (added in v3.2.0, see §9) on a
+   full day of passes (`calibrate` computes it since v3.3.0; a 24-hour
+   recording started 2026-10-13 12:57 UTC), and reconstruct how fast JELLY's,
    POPCAT's and FARTCOIN's positions were built.
 3. **Reconstruct anchors** - add depth and position numbers to incident
    records from archives, so depth-based rules get reconstructed fixtures.
@@ -276,24 +276,35 @@ so the search walks down from the top).
 data, so a value, a rule's report expression or the data cannot change without
 the others.
 
-**Open-interest growth (v3.2.0).** The JELLY check above shows a level-based
-exposure rule had no lead time: the attacker created the exposure on the day.
-`open_interest_growth_exceeds_depth` measures the last hour's new open interest
-(in asset units, valued at the current mark, so a price move is not growth)
-against the thinner side's 2% depth. It is uncalibrated: two hours of passes
-give one hour of comparisons, too little for an episode budget. What the
-recording does show, evaluated by the engine on the rule as written:
+**Open-interest growth (v3.2.0, revised in v3.3.0).** The JELLY check above
+shows a level-based exposure rule had no lead time: the attacker created the
+exposure on the day. `open_interest_growth_exceeds_depth` measures the last
+hour's new open interest (in asset units, valued at the current mark, so a
+price move is not growth) against the thinner side's 2% depth, and requires the
+growth to be material.
 
-- With depth alone at 1.0 (definitional: the hour's new positions cannot be
-  closed within 2%), 6 of 178 validator-operated markets fired, mostly small
-  ones - PURR's $61k of new positions against $12k of depth.
-- A second condition, new positions of at least 1% of the backstop's capital
-  (placeholder; $330k against HLP's liquidators, $33.0M on 2026-10-13), leaves
-  3 validator-operated markets (GRASS, PONS, TIA). On HIP-3 it changes nothing:
-  every dex's backstop held $0-$104k, so 5 of 159 HIP-3 markets fire on depth
-  alone, and any loss there goes straight to auto-deleveraging.
+Materiality was first a share of the backstop's capital (1%; $330k against
+HLP's liquidators, $33.0M on 2026-10-13). That works on validator-operated
+perps and fails on HIP-3: every dex's backstop held $0-$104k, so any growth
+counted as material, and dust markets dominated. On the two-hour recording,
+para:TTWO ($16k of growth against $286 of depth) would have set an alert-budget
+threshold of 56x depth, high enough to miss xyz:HYUNDAI's $533k against $57k.
+v3.3.0 replaces it with an absolute floor, `min_growth_usd` ($250k,
+placeholder): materiality is about the cost of a person's attention, which does
+not shrink with the market. With it the two-hour recording flags GRASS, PONS
+and TIA (validator-operated) and xyz:NBIS and xyz:HYUNDAI (HIP-3); floors from
+$100k to $250k flag the same markets.
 
-The rule therefore stays in `report` mode. A pager would need the episode
-budget above, and evidence that the anchors' build-ups were fast enough to fire
-before their liquidations.
+`calibrate` sets the depth threshold to an alert budget of one episode per day
+per surface, holding the floor fixed and never going below the definitional
+1.0. Two hours of passes give one hour of comparisons, too little for a daily
+budget, so the rule stays uncalibrated and in `report` mode until the full-day
+recording is in. A pager would also need evidence that the anchors' build-ups
+were fast enough to fire before their liquidations.
 
+**Recording on demand (v3.3.0).** `hyperliquid-security record --out-dir DIR
+--hours 24` records a session that resumes when rerun (one file per pass and a
+manifest), so a day survives restarts; `pack` merges it into one file to commit.
+The `record` GitHub workflow (Actions -> record -> Run workflow) runs a session
+as six-hour segments that resume one another and uploads the packed passes and
+the `calibrate` output as an artifact, without writing to the repository.
