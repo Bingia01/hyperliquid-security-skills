@@ -1,0 +1,65 @@
+id: oi_cap_to_depth_cross_section
+computed: '2026-10-13'
+method: 'For every HIP-3 market with a published cap, the median over the recording of the cap / thinner
+  side''s resting depth within 2% of mid from l2Book, escalating nSigFigs until 20 levels reach the band
+  edge (rows where no aggregation covered the band are excluded). Threshold = 90th percentile across markets
+  (policy choice: the most generously capped tenth relative to depth).'
+data: 'Live public API recording of every listed HIP-3 perp: 2026-10-13T06:24 to 2026-10-13T08:20 UTC,
+  12 passes.'
+limitations:
+- One recording window; caps are configuration and change by deployer action.
+targets:
+- rule: oi_cap_exceeds_depth
+  threshold: max_cap_to_depth
+  surface: hip3_perps
+  applies_as: rule_default
+  value: 558.64
+results:
+  hip3_perps:
+    surface: hip3_perps
+    markets: 159
+    rows_attempted: 1908
+    rows_measured: 1908
+    percentile: 0.9
+    value: 558.64
+    quantiles:
+      p10: 31.46
+      p25: 55.33
+      p50: 105.7
+      p75: 260.24
+      p90: 558.64
+      p95: 1086.44
+      p99: 12321.02
+    above_threshold:
+    - market: xyz:UMC
+      median: 38216.66
+    - market: xyz:OURA
+      median: 14444.56
+    - market: xyz:BIRD
+      median: 10783.29
+    - market: xyz:TWST
+      median: 5496.01
+    - market: xyz:KSTR
+      median: 2674.92
+    - market: para:ANSEM
+      median: 2121.94
+    - market: para:TREAD
+      median: 1736.57
+    - market: xyz:NCLD
+      median: 1520.65
+    - market: xyz:GIGADEV
+      median: 1038.19
+    - market: xyz:ZM
+      median: 896.02
+    - market: xyz:CVX
+      median: 777.39
+    - market: xyz:XBI
+      median: 761.5
+    - market: para:30Y
+      median: 684.96
+    - market: xyz:CXMT
+      median: 663.71
+    - market: xyz:SHAZ
+      median: 610.95
+    - market: para:TTWO
+      median: 575.45

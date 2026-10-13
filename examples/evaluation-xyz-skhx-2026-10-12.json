@@ -130,32 +130,32 @@
         "mark_move_bps_5m": null
       },
       "thresholds": {
-        "max_mark_move_bps_5m": 700.0
+        "max_mark_move_bps_5m": 725.3
       },
       "profile": "hip3_perps"
     },
     {
       "rule": "oi_cap_exceeds_depth",
-      "outcome": "fires",
+      "outcome": "silent",
       "missing": [],
       "report": {
         "cap_to_thinner_side_depth": 144.405916,
         "cap_utilization": 0.269255
       },
       "thresholds": {
-        "max_cap_to_depth": 100.0
+        "max_cap_to_depth": 558.64
       },
       "profile": "hip3_perps"
     },
     {
       "rule": "open_interest_exceeds_depth",
-      "outcome": "fires",
+      "outcome": "silent",
       "missing": [],
       "report": {
         "oi_to_thinner_side_depth": 38.881988
       },
       "thresholds": {
-        "max_oi_to_depth": 20.0
+        "max_oi_to_depth": 39.35
       },
       "profile": "hip3_perps"
     },

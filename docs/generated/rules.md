@@ -7,18 +7,18 @@
 | Rule | Stage | Mode | Severity | Evidence status | Detection validated by | Data sources | Automatable | Placeholder thresholds |
 |---|---|---|---|---|---|---|---|---|
 | `account_sweep_to_new_destinations` | post_loss | report | high | reported | synthetic only | public_api | yes | 2/2 |
-| `backstop_position_exceeds_depth` | active_attack | report | high | observed | synthetic only | public_api | yes | 1/1 |
+| `backstop_position_exceeds_depth` | active_attack | report | high | observed | synthetic only | public_api | yes | 0/1 |
 | `caller_controlled_external_call` | pre_deployment | report | critical | reported | reconstructed incident | static_analysis | yes | 0/0 |
 | `core_action_assumed_complete` | pre_deployment | report | high | theoretical | synthetic only | analyst, static_analysis | no (analyst input) | 0/0 |
 | `dex_deposits_exceed_slashable_stake` | precondition | report | medium | theoretical | synthetic only | public_api | yes | 1/1 |
-| `funded_cluster_same_direction` | precondition | report | high | reported | synthetic only | node_data, public_api | yes | 3/3 |
+| `funded_cluster_same_direction` | precondition | report | high | reported | synthetic only | node_data, public_api | yes | 2/3 |
 | `large_order_pulled_before_move` | active_attack | report | high | reported | synthetic only | node_data | yes | 3/3 |
-| `large_position_near_liquidation` | precondition | report | high | observed | synthetic only | public_api | yes | 2/2 |
-| `linked_accounts_opposite_positions` | precondition | report | high | observed | synthetic only | node_data, public_api | yes | 3/3 |
+| `large_position_near_liquidation` | precondition | report | high | observed | synthetic only | public_api | yes | 1/2 |
+| `linked_accounts_opposite_positions` | precondition | report | high | observed | synthetic only | node_data, public_api | yes | 2/3 |
 | `liquidator_loss_near_capacity` | active_attack | report | high | observed | synthetic only | public_api | yes | 1/1 |
 | `mark_diverges_from_oracle` | active_attack | report | medium | theoretical | synthetic only | public_api | yes | 1/1 |
-| `mark_jump_short_window` | active_attack | alert | high | observed | reconstructed incident | derived_history | yes | 1/1 |
-| `oi_cap_exceeds_depth` | precondition | report | medium | theoretical | synthetic only | public_api | yes | 1/1 |
-| `open_interest_exceeds_depth` | precondition | report | medium | observed | synthetic only | public_api | yes | 1/1 |
+| `mark_jump_short_window` | active_attack | alert | high | observed | reconstructed incident | derived_history | yes | 0/1 |
+| `oi_cap_exceeds_depth` | precondition | report | medium | theoretical | synthetic only | public_api | yes | 0/1 |
+| `open_interest_exceeds_depth` | precondition | report | medium | observed | synthetic only | public_api | yes | 0/1 |
 | `oracle_setter_holds_position` | precondition | report | high | theoretical | synthetic only | public_api | yes | 1/1 |
 | `privileged_role_exceeds_function` | pre_deployment | report | critical | reported | synthetic only | analyst, static_analysis | no (analyst input) | 0/0 |

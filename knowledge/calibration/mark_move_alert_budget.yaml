@@ -1,0 +1,108 @@
+id: mark_move_alert_budget
+computed: '2026-10-13'
+method: Absolute close-to-close moves between consecutive 5-minute candles for every listed perp (most
+  recent 5,000 candles each). Threshold = the lowest value at which it, and every higher value, yields
+  at most 1 alert episode per day across the surface, where consecutive exceeding windows in one market
+  count as one episode. The budget is a policy choice for a paging rule.
+data: Hyperliquid candleSnapshot, 5m candles, 2026-09-25 21:40 UTC to 2026-10-13 06:20 UTC.
+limitations:
+- Candles are trade prices; the rule reads mark price. Mark is a median including the oracle and is usually
+  smoother than last trades, so trade-move tails are expected to upper-bound mark-move tails and the episode
+  budget to hold or be undershot. This is an approximation, not a measurement of mark.
+- About 17 days of one regime; market-wide crashes are absent from the window.
+- The threshold is pooled across markets; a few volatile markets produce most episodes (see episodes_by_market).
+  Volatility-normalized moves would spread alerts evenly.
+targets:
+- rule: mark_jump_short_window
+  threshold: max_mark_move_bps_5m
+  surface: core_perps
+  applies_as: rule_default
+  value: 832.1
+- rule: mark_jump_short_window
+  threshold: max_mark_move_bps_5m
+  surface: hip3_perps
+  applies_as: profile_override
+  value: 725.3
+checks:
+- description: 'JELLY attack day (2025-03-26 00:00-15:15 UTC): largest 5-minute move 4804 bps (trade-price
+    proxy: 184 Hyperliquid 5m candles via candleSnapshot)'
+  outcome: fires against the calibrated core_perps threshold of 832 bps
+- description: 'JELLY day before (2025-03-25): largest 5-minute move 1083 bps (trade-price proxy, false-alarm
+    check: 289 Hyperliquid 5m candles via candleSnapshot)'
+  outcome: fires against the calibrated core_perps threshold of 832 bps
+- description: 'xyz:SKHYNIX oracle failure (2026-07-27 23:00 UTC): largest 5-minute move 1790 bps (mark
+    price: 17.9% fall within seconds (incident claim mark_fall; candles past retention))'
+  outcome: fires against the calibrated hip3_perps threshold of 725 bps
+results:
+  core_perps:
+    markets: 178
+    windows: 889955
+    days: 17.36
+    episodes_per_day_budget: 1.0
+    episodes_allowed: 17
+    episodes_at_threshold: 17
+    value: 832.1
+    quantiles:
+      p50: 13.6
+      p99: 119.7
+      p99.9: 253.3
+      p99.99: 477.0
+    episodes_by_market:
+    - market: GRIFFAIN
+      episodes: 3
+    - market: RSR
+      episodes: 2
+    - market: SAGA
+      episodes: 2
+    - market: CFX
+      episodes: 1
+    - market: BLUR
+      episodes: 1
+    - market: UMA
+      episodes: 1
+    - market: W
+      episodes: 1
+    - market: PURR
+      episodes: 1
+    - market: RESOLV
+      episodes: 1
+    - market: HEMI
+      episodes: 1
+    - market: 2Z
+      episodes: 1
+    - market: CASHCAT
+      episodes: 1
+    - market: PONS
+      episodes: 1
+  hip3_perps:
+    markets: 159
+    windows: 769780
+    days: 17.36
+    episodes_per_day_budget: 1.0
+    episodes_allowed: 17
+    episodes_at_threshold: 17
+    value: 725.3
+    quantiles:
+      p50: 0.7
+      p99: 78.4
+      p99.9: 215.0
+      p99.99: 479.0
+    episodes_by_market:
+    - market: para:TREAD
+      episodes: 8
+    - market: xyz:LRCX
+      episodes: 2
+    - market: xyz:KIOXIA
+      episodes: 1
+    - market: xyz:BOT
+      episodes: 1
+    - market: xyz:HO
+      episodes: 1
+    - market: xyz:UMC
+      episodes: 1
+    - market: para:SOFI
+      episodes: 1
+    - market: mkts:BVIV
+      episodes: 1
+    - market: io:XIAOMI
+      episodes: 1

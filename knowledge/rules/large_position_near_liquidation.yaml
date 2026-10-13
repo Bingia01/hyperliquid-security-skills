@@ -19,7 +19,7 @@ thresholds:
   max_position_to_depth:
     value: 1.0
     unit: ratio
-    basis: placeholder
+    basis: definitional
   max_liquidation_distance_bps:
     value: 300.0
     unit: bps

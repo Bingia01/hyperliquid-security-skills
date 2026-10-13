@@ -19,13 +19,15 @@ protects: [loss_containment]
 anchors: [hl-2025-03-jelly, hl-2025-11-popcat, hl-2025-08-xpl-hyperp]
 thresholds:
   max_oi_to_depth:
-    value: 50.0
+    value: 67.27
     unit: ratio
-    basis: placeholder
+    basis: calibrated
+    calibration: open_interest_to_depth_cross_section
     note: >-
-      Open interest is never liquidated at once, so the ratio is a coarse proxy
-      for liquidation overhang. Needs calibration on the archived l2Book and
-      asset context data before it means anything across markets.
+      90th percentile across validator-operated perps of each market's median
+      ratio (2026-10-13 recording): firing means "among the most exposed tenth
+      of markets", a structural ranking. Open interest is never liquidated at
+      once, so the ratio is a coarse proxy for liquidation overhang.
 condition: >-
   market.open_interest_usd / min(market.bid_depth_usd_2pct, market.ask_depth_usd_2pct)
   >= threshold.max_oi_to_depth
@@ -44,7 +46,7 @@ fixtures:
     expect: fires
     provenance: synthetic
     surface: core_perps
-    values: {market.open_interest_usd: 18.0e6, market.bid_depth_usd_2pct: 0.3e6, market.ask_depth_usd_2pct: 0.5e6}
+    values: {market.open_interest_usd: 30.0e6, market.bid_depth_usd_2pct: 0.3e6, market.ask_depth_usd_2pct: 0.5e6}
   - name: deep market is silent
     expect: silent
     provenance: synthetic
@@ -54,7 +56,7 @@ fixtures:
     expect: fires
     provenance: synthetic
     surface: core_perps
-    values: {market.open_interest_usd: 50.0e6, market.bid_depth_usd_2pct: 1.0e6, market.ask_depth_usd_2pct: 2.0e6}
+    values: {market.open_interest_usd: 67.27e6, market.bid_depth_usd_2pct: 1.0e6, market.ask_depth_usd_2pct: 2.0e6}
   - name: an empty side counts as infinitely thin
     expect: fires
     provenance: synthetic

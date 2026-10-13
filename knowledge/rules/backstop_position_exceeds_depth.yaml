@@ -22,7 +22,7 @@ thresholds:
   max_backstop_to_depth:
     value: 1.0
     unit: ratio
-    basis: placeholder
+    basis: definitional
     note: >-
       1.0 means the backstop cannot exit within 2% even if it takes all resting
       depth on that side. Positions far below this unwind routinely.

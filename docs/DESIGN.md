@@ -58,7 +58,7 @@ Each assumption is listed with what the design does when it fails.
 | A3 | Mechanisms leave traces in observable data before losses become irreversible. | True for exposures (preconditions), partly true for attacks in progress, false for key theft (detected after loss). Each rule declares its `stage`. |
 | A4 | Someone can act on a rule's output in time. | Each rule names a `consumer` and `action`. A rule nobody can act on is a dashboard metric. |
 | A5 | The data a feature needs can be obtained. | Each feature declares its source type. Public API covers market, backstop, dex and named-account features; clusters and orders need node data; external venues are out of scope today. Missing data yields `unknown`. |
-| A6 | Thresholds can separate attacks from normal activity. | Unproven. Incidents are rare (fourteen recorded in about three and a half years, two of them confirmed) while evaluation is frequent, so precision collapses at any non-trivial false-positive rate. All thresholds are marked `placeholder` until calibrated on archived data; live sampling already shows open interest over depth ranges 12-141 across healthy markets. |
+| A6 | Thresholds can separate attacks from normal activity. | Unproven. Incidents are rare (fourteen recorded in about three and a half years, two of them confirmed) while evaluation is frequent, so precision collapses at any non-trivial false-positive rate. Five threshold values are now calibrated on recorded data (section 9) to stated targets - a cross-sectional rank or an alert budget - and the rest are marked `placeholder` or `definitional`. |
 | A7 | Attackers do not adapt to published rules. | False in general (POPCAT sharded across 19 wallets). Relative, mechanism-level measures (exposure versus depth, incentive versus bond) are harder to evade than signatures. |
 | A8 | Hyperliquid's mechanics stay as documented. | They change (liquidator cap, transfer margin, hyperp mark caps). Facts the code relies on are dated in comments and docs. |
 
@@ -200,7 +200,8 @@ docs/generated/       computed summaries
 ## 7. Constraints
 
 - **Data.** No public endpoint lists all positions; liquidation overhang, clusters and order lifetimes need a non-validating node (`--write-order-statuses`, `--write-raw-book-diffs`, fills) or the requester-pays S3 archives. External venue data (oracle inputs) is out of scope today, so external price pushes - JELLY's amplifier - have no rule yet (listed as a gap in `docs/generated/coverage.md`).
-- **Base rates.** Confirmed incidents are rare; thresholds without calibration on historical data produce mostly false alarms. No rule here has been calibrated.
+- **Base rates.** Confirmed incidents are rare; thresholds without calibration produce mostly false alarms. Calibrated values cover one quiet regime (section 9); stress regimes are absent from the data.
+- **Archives.** Hyperliquid's S3 archive is requester-pays (AWS credentials billed to the requester) and, like Tardis, stores the 20-level full-precision book, which never reaches a 2% band on liquid markets and did not on thin JELLY either. Depth-based quantities need live recording; archives give only bounds.
 - **Evidence.** Hyperliquid publishes few postmortems; many tiers rest on technical secondary sources. Claim-to-source mappings were verified line by line for JELLY and xyz:SKHYNIX only.
 - **Mechanics drift.** Facts about the protocol are dated; re-verify before relying on numbers.
 - **Scope.** Detection informs people; this repository places no orders, signs nothing and ships no exploit code.
@@ -212,15 +213,65 @@ evaluation for validator-operated and HIP-3 markets, generated reports, four
 skills.
 
 Ordered by value:
-1. **Calibrate** - replay archived `l2Book` and asset contexts (S3
-   `hyperliquid-archive`) to get each ratio's distribution per market; replace
-   placeholders with stated quantiles.
-2. **Reconstruct anchors** - add depth and position numbers to incident
+1. **Calibrate across regimes** - repeat the recording during volatile weeks and
+   compare; calibrate `mark_diverges_from_oracle` from continuous mark and
+   oracle history (Tardis `derivative_ticker`); normalize price moves by each
+   market's volatility so alerts spread across markets.
+2. **Open-interest growth rule** - the JELLY archive check shows a level-based
+   exposure rule had no lead time: the attacker created the exposure on the day.
+   Open-interest growth relative to depth would see it.
+3. **Reconstruct anchors** - add depth and position numbers to incident
    records from archives, so depth-based rules get reconstructed fixtures.
-3. **Node-data adapter** - order lifetimes, fills with liquidation tags,
+4. **Node-data adapter** - order lifetimes, fills with liquidation tags,
    cluster discovery.
-4. **External venues** - oracle-source depth, to measure cost-to-move against
+5. **External venues** - oracle-source depth, to measure cost-to-move against
    open interest (invariant 2 directly).
-5. **Link checker** - fetch every source URL in CI on a schedule; flag dead
+6. **Link checker** - fetch every source URL in CI on a schedule; flag dead
    links.
-6. **Verify citations** for the remaining twelve incidents.
+7. **Verify citations** for the remaining twelve incidents.
+
+## 9. Calibration (2026-10-13)
+
+**Data.** Hyperliquid's S3 archive could not be used: it is requester-pays and
+no AWS credentials were available. More importantly, archived books store the
+20-level full-precision feed: in Tardis's record of that feed for BTC on
+2025-11-01, 0 of 157,225 snapshots reached the 2% band (median span 1.8 bps),
+and even thin JELLY's levels spanned only 0.7% on 2025-03-01. The thresholds
+were therefore calibrated on data recorded for the purpose and committed in
+`knowledge/calibration/data/`:
+
+- 12 passes over all 337 listed perps (178 validator-operated, 159 HIP-3),
+  06:24-08:21 UTC on 2026-10-13, depth measured with escalating `nSigFigs`;
+- 17 days of 5-minute candles for the same markets (trade prices, a proxy for
+  mark).
+
+**Targets.** A threshold needs a target before it needs data. Precondition
+rules rank markets: the 90th percentile of each market's median ratio, so
+firing means "among the most exposed tenth". The alert rule has a budget: the
+lowest threshold at which it and every higher one give at most one alert
+episode per day per surface (episode counts are not monotone in the threshold,
+so the search walks down from the top).
+
+**Results** (details in `docs/generated/calibration.md`):
+
+| Threshold | Validator-operated perps | HIP-3 |
+|---|---|---|
+| Open interest / thinner side's 2% depth | 67.27 (median market 18.5) | 39.35 (median 8.65) |
+| HIP-3 open interest cap / thinner side's 2% depth | - | 558.64 (median 105.7; xyz:UMC 38,217) |
+| 5-minute move, bps | 832.1 (99.99th pct 477) | 725.3 (one market, para:TREAD, gives 8 of 17 episodes) |
+
+**Checks against incidents** (never used to choose a value):
+
+- JELLY's attack day: 5-minute trade moves up to 4,804 bps - fires. The day
+  before also reached 1,083 bps and would have fired: an early sign or a false
+  alarm, which the data cannot separate.
+- xyz:SKHYNIX: the 1,790 bps mark fall fires against 725.3.
+- JELLY 25 days before its attack: the archive bounds its ratio at a median 33.7
+  at most, below 67.27 - the precondition rule would not have flagged it.
+- POPCAT 11 days before: the bound's median (68.4) reaches the threshold;
+  inconclusive.
+
+`tests/test_calibration.py` recomputes every calibrated value from the committed
+data, so a value, a rule's report expression or the data cannot change without
+the others.
+

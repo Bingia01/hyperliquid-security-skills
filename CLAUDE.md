@@ -12,6 +12,8 @@ it. Read `docs/DESIGN.md` before changing structure.
   `knowledge/rules/<id>.yaml` with passing fixtures.
 - Checking a live market: use the `monitor-market` skill.
 - Reviewing HyperEVM contracts: use the `hyperevm-review` skill.
+- Calibrating thresholds: `hyperliquid-security record`, then `calibrate`
+  (see the `author-rule` skill); results go to `knowledge/calibration/`.
 
 After any change to `knowledge/` or `src/`:
 
@@ -36,6 +38,7 @@ hyperliquid-security report        # regenerate docs/generated/; never edit thos
 - Evidence tiers and rule statuses are derived; never write them by hand.
 - Do not fill missing data with defaults. Absent means `unknown`.
 - Every number in a rule condition is a named threshold with a unit and a
-  basis. Placeholders say so.
+  basis. Placeholders say so; calibrated values cite their calibration result,
+  and nobody tunes a threshold to make an anchor fire.
 - Facts about Hyperliquid mechanics change; verify against the live API or
   current docs before relying on them, and date what you verified.

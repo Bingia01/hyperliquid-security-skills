@@ -24,7 +24,7 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Protocol
 
 HLP_PARENT = "0xdfc24b077bc1425ad1dea75bcb6f8158e10df303"
 HIP3_BACKSTOP_BASE = 0x4000000000000000000000000000000000000000
@@ -35,6 +35,12 @@ SIG_FIG_LADDER: tuple[int | None, ...] = (None, 5, 4, 3, 2)
 MARK_HISTORY_WINDOW_SECONDS = (240.0, 360.0)
 
 Transport = Callable[[dict[str, Any]], Any]
+
+
+class Poster(Protocol):
+    """Anything that answers info requests (the client, or a rate-limited wrapper)."""
+
+    def post(self, payload: dict[str, Any]) -> Any: ...
 
 
 class ApiError(RuntimeError):
@@ -122,7 +128,7 @@ def side_depth(levels: list[dict[str, Any]], mid: float, side: str) -> tuple[flo
     return sum(_f(lv["px"]) * _f(lv["sz"]) for lv in inside), covered
 
 
-def measure_depth(client: InfoClient, coin: str, snapshot: _Snapshot) -> None:
+def measure_depth(client: Poster, coin: str, snapshot: _Snapshot) -> None:
     bids_needed, asks_needed = True, True
     mid: float | None = None
     for sig_figs in SIG_FIG_LADDER:

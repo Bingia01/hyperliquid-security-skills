@@ -16,6 +16,7 @@ import yaml
 from pydantic import BaseModel, ValidationError
 
 from .model import (
+    CalibrationResult,
     ControlOwner,
     Entity,
     Feature,
@@ -52,6 +53,7 @@ class KnowledgeBase:
     incidents: dict[str, Incident] = field(default_factory=dict)
     rules: dict[str, Rule] = field(default_factory=dict)
     profiles: dict[str, Profile] = field(default_factory=dict)
+    calibrations: dict[str, CalibrationResult] = field(default_factory=dict)
     files: dict[str, Path] = field(default_factory=dict)  # "rule:<id>" -> path
 
 
@@ -192,6 +194,7 @@ def load(root: Path) -> tuple[KnowledgeBase, list[Problem]]:
         ("incidents", Incident, "incidents"),
         ("rules", Rule, "rules"),
         ("profiles", Profile, "profiles"),
+        ("calibration", CalibrationResult, "calibrations"),
     ):
         records_by_id: dict[str, Any] = {}
         for path in sorted((root / directory).glob("*.yaml")):
