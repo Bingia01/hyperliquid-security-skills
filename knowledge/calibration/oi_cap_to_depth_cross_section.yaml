@@ -1,11 +1,11 @@
 id: oi_cap_to_depth_cross_section
-computed: '2026-10-13'
+computed: '2026-10-15'
 method: 'For every HIP-3 market with a published cap, the median over the recording of the cap / thinner
   side''s resting depth within 2% of mid from l2Book, escalating nSigFigs until 20 levels reach the band
   edge (rows where no aggregation covered the band are excluded). Threshold = 90th percentile across markets
   (policy choice: the most generously capped tenth relative to depth).'
-data: 'Live public API recording of every listed HIP-3 perp: 2026-10-13T06:24 to 2026-10-13T08:20 UTC,
-  12 passes.'
+data: 'Live public API recording of every listed HIP-3 perp: 2026-10-14T01:02 to 2026-10-15T01:08 UTC,
+  145 passes.'
 limitations:
 - One recording window; caps are configuration and change by deployer action.
 targets:
@@ -13,53 +13,55 @@ targets:
   threshold: max_cap_to_depth
   surface: hip3_perps
   applies_as: rule_default
-  value: 558.64
+  value: 420.78
 results:
   hip3_perps:
     surface: hip3_perps
-    markets: 159
-    rows_attempted: 1908
-    rows_measured: 1908
+    markets: 161
+    rows_attempted: 23244
+    rows_measured: 23239
     percentile: 0.9
-    value: 558.64
+    value: 420.78
     quantiles:
-      p10: 31.46
-      p25: 55.33
-      p50: 105.7
-      p75: 260.24
-      p90: 558.64
-      p95: 1086.44
-      p99: 12321.02
+      p10: 33.24
+      p25: 53.81
+      p50: 93.55
+      p75: 176.62
+      p90: 420.78
+      p95: 759.84
+      p99: 5110.63
     above_threshold:
-    - market: xyz:UMC
-      median: 38216.66
     - market: xyz:OURA
-      median: 14444.56
+      median: 8387.47
     - market: xyz:BIRD
-      median: 10783.29
+      median: 8192.69
     - market: xyz:TWST
-      median: 5496.01
-    - market: xyz:KSTR
-      median: 2674.92
-    - market: para:ANSEM
-      median: 2121.94
+      median: 3055.92
     - market: para:TREAD
-      median: 1736.57
-    - market: xyz:NCLD
-      median: 1520.65
+      median: 2358.06
+    - market: para:ANSEM
+      median: 2137.02
     - market: xyz:GIGADEV
-      median: 1038.19
-    - market: xyz:ZM
-      median: 896.02
-    - market: xyz:CVX
-      median: 777.39
-    - market: xyz:XBI
-      median: 761.5
+      median: 1639.55
+    - market: xyz:UMC
+      median: 945.02
+    - market: xyz:NCLD
+      median: 914.7
+    - market: xyz:SHEIN
+      median: 759.84
+    - market: xyz:KSTR
+      median: 748.81
     - market: para:30Y
-      median: 684.96
+      median: 684.95
     - market: xyz:CXMT
-      median: 663.71
-    - market: xyz:SHAZ
-      median: 610.95
-    - market: para:TTWO
-      median: 575.45
+      median: 628.3
+    - market: para:2Y
+      median: 624.86
+    - market: xyz:HO
+      median: 576.67
+    - market: para:UNITREE
+      median: 513.16
+    - market: xyz:SOFTBANK
+      median: 486.04
+    - market: xyz:HYUNDAI
+      median: 420.78

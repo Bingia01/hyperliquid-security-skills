@@ -217,10 +217,12 @@ Ordered by value:
    compare; calibrate `mark_diverges_from_oracle` from continuous mark and
    oracle history (Tardis `derivative_ticker`); normalize price moves by each
    market's volatility so alerts spread across markets.
-2. **Calibrate the open-interest growth rule** (added in v3.2.0, see §9) on a
-   full day of passes (`calibrate` computes it since v3.3.0; a 24-hour
-   recording started 2026-10-13 12:57 UTC), and reconstruct how fast JELLY's,
-   POPCAT's and FARTCOIN's positions were built.
+2. **Choose the growth rule's HIP-3 target, and record more days** (§9). One
+   alert a day per surface gave HIP-3 a threshold of 133.65, set by one new
+   listing; the options are a larger HIP-3 budget, excluding markets in their
+   first days, or the definitional 1.0 as a watchlist. With one day, every
+   budget threshold is that day's maximum; a week of passes would make it an
+   estimate.
 3. **Reconstruct anchors** - add depth and position numbers to incident
    records from archives, so depth-based rules get reconstructed fixtures.
 4. **Node-data adapter** - order lifetimes, fills with liquidation tags,
@@ -231,7 +233,7 @@ Ordered by value:
    links.
 7. **Verify citations** for the remaining twelve incidents.
 
-## 9. Calibration (2026-10-13)
+## 9. Calibration (2026-10-13, recalibrated 2026-10-15)
 
 **Data.** Hyperliquid's S3 archive could not be used: it is requester-pays and
 no AWS credentials were available. More importantly, archived books store the
@@ -241,25 +243,36 @@ and even thin JELLY's levels spanned only 0.7% on 2025-03-01. The thresholds
 were therefore calibrated on data recorded for the purpose and committed in
 `knowledge/calibration/data/`:
 
-- 12 passes over all 337 listed perps (178 validator-operated, 159 HIP-3),
-  06:24-08:21 UTC on 2026-10-13, depth measured with escalating `nSigFigs`;
+- 145 passes over every listed perp (178 validator-operated, 161 HIP-3), one
+  every 10 minutes from 01:02 UTC on 2026-10-14 to 01:02 UTC on 2026-10-15,
+  depth measured with escalating `nSigFigs`, no pass skipped
+  (`passes_2026-10-14.jsonl.gz`). It replaces a two-hour recording (06:24-08:21
+  UTC on 2026-10-13); a first 24-hour attempt ended after two hours on a
+  dropped connection (fixed in v3.3.1), and a second died with its container.
 - 17 days of 5-minute candles for the same markets (trade prices, a proxy for
   mark).
 
 **Targets.** A threshold needs a target before it needs data. Precondition
 rules rank markets: the 90th percentile of each market's median ratio, so
-firing means "among the most exposed tenth". The alert rule has a budget: the
-lowest threshold at which it and every higher one give at most one alert
-episode per day per surface (episode counts are not monotone in the threshold,
-so the search walks down from the top).
+firing means "among the most exposed tenth". Alert and active-attack rules have
+a budget: the lowest threshold at which it and every higher one give at most
+one alert episode per day per surface (episode counts are not monotone in the
+threshold, so the search walks down from the top).
 
-**Results** (details in `docs/generated/calibration.md`):
+**Results** (details in `docs/generated/calibration.md`; two-hour values in
+brackets):
 
 | Threshold | Validator-operated perps | HIP-3 |
 |---|---|---|
-| Open interest / thinner side's 2% depth | 67.27 (median market 18.5) | 39.35 (median 8.65) |
-| HIP-3 open interest cap / thinner side's 2% depth | - | 558.64 (median 105.7; xyz:UMC 38,217) |
-| 5-minute move, bps | 832.1 (99.99th pct 477) | 725.3 (one market, para:TREAD, gives 8 of 17 episodes) |
+| Open interest / thinner side's 2% depth | 68.87 [67.27] (median market 17.4) | 31.04 [39.35] (median 7.6) |
+| HIP-3 open interest cap / thinner side's 2% depth | - | 420.78 [558.64] (median 93.6) |
+| 5-minute move, bps (candles) | 832.1 (99.99th pct 477) | 725.3 (para:TREAD gives 8 of 17 episodes) |
+| Last hour's new open interest / 2% depth | 9.64 (PYTH) | 133.65 (io:PRL) |
+
+The validator-operated ranking barely moved. The HIP-3 ones fell because the
+two-hour window sat outside US trading hours: HIP-3 markets are mostly equity
+and index perps, whose books deepen while the underlying trades. The median HIP-3 market's
+ratio is 8.7 between 06:00 and 08:00 UTC and 4.5 between 14:00 and 20:00.
 
 **Checks against incidents** (never used to choose a value):
 
@@ -268,39 +281,48 @@ so the search walks down from the top).
   alarm, which the data cannot separate.
 - xyz:SKHYNIX: the 1,790 bps mark fall fires against 725.3.
 - JELLY 25 days before its attack: the archive bounds its ratio at a median 33.7
-  at most, below 67.27 - the precondition rule would not have flagged it.
-- POPCAT 11 days before: the bound's median (68.4) reaches the threshold;
-  inconclusive.
+  at most, below 68.87 - the precondition rule would not have flagged it.
+- POPCAT 11 days before: the bound's median (68.4) is 0.7% below 68.87. The
+  calibration reports "would not have fired"; with the bound on the threshold,
+  read it as inconclusive.
+- The growth rule's anchors (JELLY, POPCAT, FARTCOIN) cannot be checked: no
+  available source holds hourly open interest for their attack days.
 
 `tests/test_calibration.py` recomputes every calibrated value from the committed
 data, so a value, a rule's report expression or the data cannot change without
 the others.
 
-**Open-interest growth (v3.2.0, revised in v3.3.0).** The JELLY check above
-shows a level-based exposure rule had no lead time: the attacker created the
-exposure on the day. `open_interest_growth_exceeds_depth` measures the last
-hour's new open interest (in asset units, valued at the current mark, so a
-price move is not growth) against the thinner side's 2% depth, and requires the
-growth to be material.
+**Open-interest growth (v3.2.0, revised in v3.3.0, calibrated in v3.4.0).**
+The JELLY check above shows a level-based exposure rule had no lead time: the
+attacker created the exposure on the day. `open_interest_growth_exceeds_depth`
+measures the last hour's new open interest (in asset units, valued at the
+current mark, so a price move is not growth) against the thinner side's 2%
+depth, and requires the growth to be material.
 
 Materiality was first a share of the backstop's capital (1%; $330k against
 HLP's liquidators, $33.0M on 2026-10-13). That works on validator-operated
 perps and fails on HIP-3: every dex's backstop held $0-$104k, so any growth
-counted as material, and dust markets dominated. On the two-hour recording,
-para:TTWO ($16k of growth against $286 of depth) would have set an alert-budget
-threshold of 56x depth, high enough to miss xyz:HYUNDAI's $533k against $57k.
-v3.3.0 replaces it with an absolute floor, `min_growth_usd` ($250k,
-placeholder): materiality is about the cost of a person's attention, which does
-not shrink with the market. With it the two-hour recording flags GRASS, PONS
-and TIA (validator-operated) and xyz:NBIS and xyz:HYUNDAI (HIP-3); floors from
-$100k to $250k flag the same markets.
+counted as material, and dust markets dominated. v3.3.0 replaced it with an
+absolute floor, `min_growth_usd` ($250k, placeholder): materiality is about the
+cost of a person's attention, which does not shrink with the market.
 
-`calibrate` sets the depth threshold to an alert budget of one episode per day
-per surface, holding the floor fixed and never going below the definitional
-1.0. Two hours of passes give one hour of comparisons, too little for a daily
-budget, so the rule stays uncalibrated and in `report` mode until the full-day
-recording is in. A pager would also need evidence that the anchors' build-ups
-were fast enough to fire before their liquidations.
+The depth threshold is calibrated to the one-episode-a-day budget, holding the
+floor fixed. Episodes per day on the full-day recording:
+
+| Threshold (x depth) | 1 | 2 | 5 | 10 | 20 | budget |
+|---|---|---|---|---|---|---|
+| Validator-operated | 28 (13 markets) | 16 | 5 | 0 | 0 | 9.64 |
+| HIP-3 | 52 (35 markets) | 21 | 13 | 4 | 3 | 133.65 |
+
+On validator-operated perps the budget picks one real event: PYTH, 03:13-04:03
+UTC, about $2.1M of new open interest an hour (+40%) against $220-275k of
+depth. On HIP-3 it fails. io:PRL, listed at 17:57 UTC, still had $2.3k of depth
+when $311k of positions arrived, and its 133.65 hides xyz:CRWV ($21-34M an hour
+against $1.1-1.8M, 13-23x, 19:45-20:46 UTC) and xyz:SKHX ($72M against $4.5M,
+16x, 23:56 UTC). The value is applied as computed, because changing the target
+after seeing the data would be tuning; the target itself needs a decision
+(§8, item 2). The rule stays in `report` mode, and with one day the budget's
+single episode is simply the day's maximum.
 
 **Recording on demand (v3.3.0).** `hyperliquid-security record --out-dir DIR
 --hours 24` records a session that resumes when rerun (one file per pass and a

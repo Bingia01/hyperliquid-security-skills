@@ -1,5 +1,24 @@
 # Changelog
 
+## v3.4.0
+
+- **Calibrated on a full day.** 145 passes over every listed perp, 01:02 UTC
+  2026-10-14 to 01:02 UTC 2026-10-15, none skipped, replace the two-hour
+  recording (`passes_2026-10-14.jsonl.gz`).
+  - `open_interest_exceeds_depth`: 68.87 validator-operated (was 67.27), 31.04
+    HIP-3 (was 39.35). HIP-3 books deepen during US trading hours, which the
+    two-hour morning window missed.
+  - `oi_cap_exceeds_depth`: 420.78 (was 558.64).
+  - `open_interest_growth_exceeds_depth.max_growth_to_depth`: 9.64
+    validator-operated (one event, PYTH 03:13-04:03 UTC) and 133.65 HIP-3 (one
+    new listing, io:PRL). The HIP-3 value hides 13-23x build-ups on xyz:CRWV
+    and xyz:SKHX; it is applied as computed and its target awaits a decision.
+- The POPCAT archive check now reads "would not have fired" by a 0.7% margin;
+  treat it as inconclusive.
+- The growth threshold rounds down when the budget allows, so the episode that
+  set it still fires.
+- The reproducibility test also recomputes the growth calibration.
+
 ## v3.3.1
 
 - **Recorder survives network failures.** The info client now retries dropped

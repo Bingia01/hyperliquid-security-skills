@@ -412,14 +412,18 @@ def test_committed_calibrations_reproduce_from_committed_data(repo_kb: Knowledge
     Changing a rule's report expression, or the data, without recalibrating
     fails here. (Archive checks need third-party files and are not re-run.)
     """
-    from hyperliquid_security.calibration import calibrate_cross_sections, load_passes
+    from hyperliquid_security.calibration import (
+        calibrate_cross_sections,
+        calibrate_open_interest_growth,
+        load_passes,
+    )
     from tests.conftest import KNOWLEDGE
 
     data = KNOWLEDGE / "calibration" / "data"
-    computed = dt.date(2026, 10, 13)
-    fresh = calibrate_cross_sections(
-        repo_kb, load_passes(data / "passes_2026-10-13.jsonl.gz"), computed
-    )
+    computed = dt.date(2026, 10, 15)
+    rows = load_passes(data / "passes_2026-10-14.jsonl.gz")
+    fresh = calibrate_cross_sections(repo_kb, rows, computed)
+    fresh.append(calibrate_open_interest_growth(repo_kb, rows, computed))
     fresh.append(calibrate_mark_moves(data / "candles_5m_2026-10-13.json.gz", computed))
     for result in fresh:
         committed = repo_kb.calibrations[result["id"]]

@@ -7,8 +7,10 @@ description: >-
   validator) or a placeholder; see docs/generated/calibration.md.
 overrides:
   open_interest_exceeds_depth:
-    max_oi_to_depth: 39.35  # calibrated: open_interest_to_depth_cross_section
+    max_oi_to_depth: 31.04  # calibrated: open_interest_to_depth_cross_section
   mark_diverges_from_oracle:
     max_mark_oracle_bps: 100.0  # placeholder
+  open_interest_growth_exceeds_depth:
+    max_growth_to_depth: 133.65  # calibrated: open_interest_growth_alert_budget
   mark_jump_short_window:
     max_mark_move_bps_5m: 725.3  # calibrated: mark_move_alert_budget

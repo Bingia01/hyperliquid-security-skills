@@ -694,7 +694,8 @@ def calibrate_open_interest_growth(
         ),
         "data": f"Live public API recording of every listed perp: {window}.",
         "limitations": [
-            "One day in one market regime; news-driven or stressed days are absent.",
+            "One day; whether it was typical is unknown, and with a budget of one episode "
+            "the threshold is that day's largest episode.",
             "The materiality threshold (min_growth_usd) is a placeholder held fixed; only the "
             "depth threshold is calibrated, conditional on it.",
             "Open interest change is net of closes, so heavy turnover hides some new positions.",

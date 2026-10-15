@@ -16,13 +16,13 @@ protects: [loss_containment]
 anchors: []
 thresholds:
   max_cap_to_depth:
-    value: 558.64
+    value: 420.78
     unit: ratio
     basis: calibrated
     calibration: oi_cap_to_depth_cross_section
     note: >-
       90th percentile across HIP-3 markets of each market's median cap-to-depth
-      ratio (2026-10-13 recording): the most generously capped tenth.
+      ratio (full-day recording, 2026-10-14): the most generously capped tenth.
 condition: >-
   market.oi_cap_usd / min(market.bid_depth_usd_2pct, market.ask_depth_usd_2pct)
   >= threshold.max_cap_to_depth

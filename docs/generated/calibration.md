@@ -26,11 +26,12 @@ Where every threshold value comes from. *calibrated* values were computed by `hy
 | `mark_diverges_from_oracle` | `max_mark_oracle_bps` | hip3_perps | 100 bps | placeholder | - |
 | `mark_jump_short_window` | `max_mark_move_bps_5m` | default | 832.1 bps | calibrated | `mark_move_alert_budget` |
 | `mark_jump_short_window` | `max_mark_move_bps_5m` | hip3_perps | 725.3 bps | calibrated | `mark_move_alert_budget` |
-| `oi_cap_exceeds_depth` | `max_cap_to_depth` | default | 558.64 ratio | calibrated | `oi_cap_to_depth_cross_section` |
-| `open_interest_exceeds_depth` | `max_oi_to_depth` | default | 67.27 ratio | calibrated | `open_interest_to_depth_cross_section` |
-| `open_interest_exceeds_depth` | `max_oi_to_depth` | hip3_perps | 39.35 ratio | calibrated | `open_interest_to_depth_cross_section` |
+| `oi_cap_exceeds_depth` | `max_cap_to_depth` | default | 420.78 ratio | calibrated | `oi_cap_to_depth_cross_section` |
+| `open_interest_exceeds_depth` | `max_oi_to_depth` | default | 68.87 ratio | calibrated | `open_interest_to_depth_cross_section` |
+| `open_interest_exceeds_depth` | `max_oi_to_depth` | hip3_perps | 31.04 ratio | calibrated | `open_interest_to_depth_cross_section` |
 | `open_interest_exceeds_depth` | `max_oi_to_depth` | hyperps | 20 ratio | placeholder | - |
-| `open_interest_growth_exceeds_depth` | `max_growth_to_depth` | default | 1 ratio | definitional | - |
+| `open_interest_growth_exceeds_depth` | `max_growth_to_depth` | default | 9.64 ratio | calibrated | `open_interest_growth_alert_budget` |
+| `open_interest_growth_exceeds_depth` | `max_growth_to_depth` | hip3_perps | 133.65 ratio | calibrated | `open_interest_growth_alert_budget` |
 | `open_interest_growth_exceeds_depth` | `min_growth_usd` | default | 250000 usd | placeholder | - |
 | `oracle_setter_holds_position` | `min_conflicted_notional_usd` | default | 100000 usd | placeholder | - |
 
@@ -73,43 +74,75 @@ Episodes by market: GRIFFAIN (3), RSR (2), SAGA (2), CFX (1), BLUR (1), UMA (1),
 
 Episodes by market: para:TREAD (8), xyz:LRCX (2), xyz:KIOXIA (1), xyz:BOT (1), xyz:HO (1), xyz:UMC (1), para:SOFI (1), mkts:BVIV (1), io:XIAOMI (1).
 
-## `oi_cap_to_depth_cross_section` (computed 2026-10-13)
+## `oi_cap_to_depth_cross_section` (computed 2026-10-15)
 
 **Method.** For every HIP-3 market with a published cap, the median over the recording of the cap / thinner side's resting depth within 2% of mid from l2Book, escalating nSigFigs until 20 levels reach the band edge (rows where no aggregation covered the band are excluded). Threshold = 90th percentile across markets (policy choice: the most generously capped tenth relative to depth).
 
-**Data.** Live public API recording of every listed HIP-3 perp: 2026-10-13T06:24 to 2026-10-13T08:20 UTC, 12 passes.
+**Data.** Live public API recording of every listed HIP-3 perp: 2026-10-14T01:02 to 2026-10-15T01:08 UTC, 145 passes.
 
 | Rule | Threshold | Surface | Applied as | Value |
 |---|---|---|---|---|
-| `oi_cap_exceeds_depth` | `max_cap_to_depth` | hip3_perps | rule_default | 558.64 |
+| `oi_cap_exceeds_depth` | `max_cap_to_depth` | hip3_perps | rule_default | 420.78 |
 
 **Limitations.**
 
 - One recording window; caps are configuration and change by deployer action.
 
-**hip3_perps.** markets: 159, rows_attempted: 1908, rows_measured: 1908, percentile: 0.9, value: 558.64
+**hip3_perps.** markets: 161, rows_attempted: 23244, rows_measured: 23239, percentile: 0.9, value: 420.78
 
 | p10 | p25 | p50 | p75 | p90 | p95 | p99 |
 |---|---|---|---|---|---|---|
-| 31.46 | 55.33 | 105.7 | 260.24 | 558.64 | 1086.44 | 12321.02 |
+| 33.24 | 53.81 | 93.55 | 176.62 | 420.78 | 759.84 | 5110.63 |
 
-At or above threshold: xyz:UMC (38216.66), xyz:OURA (14444.56), xyz:BIRD (10783.29), xyz:TWST (5496.01), xyz:KSTR (2674.92), para:ANSEM (2121.94), para:TREAD (1736.57), xyz:NCLD (1520.65), xyz:GIGADEV (1038.19), xyz:ZM (896.02), xyz:CVX (777.39), xyz:XBI (761.5), para:30Y (684.96), xyz:CXMT (663.71), xyz:SHAZ (610.95), para:TTWO (575.45).
+At or above threshold: xyz:OURA (8387.47), xyz:BIRD (8192.69), xyz:TWST (3055.92), para:TREAD (2358.06), para:ANSEM (2137.02), xyz:GIGADEV (1639.55), xyz:UMC (945.02), xyz:NCLD (914.7), xyz:SHEIN (759.84), xyz:KSTR (748.81), para:30Y (684.95), xyz:CXMT (628.3), para:2Y (624.86), xyz:HO (576.67), para:UNITREE (513.16), xyz:SOFTBANK (486.04), xyz:HYUNDAI (420.78).
 
-## `open_interest_to_depth_cross_section` (computed 2026-10-13)
+## `open_interest_growth_alert_budget` (computed 2026-10-15)
 
-**Method.** For every listed market, the median over the recording of the rule's own ratio (open interest / thinner side's resting depth within 2% of mid from l2Book, escalating nSigFigs until 20 levels reach the band edge (rows where no aggregation covered the band are excluded)). Threshold = 90th percentile of those medians across markets of the surface, so the rule marks the most exposed tenth of markets. The percentile is a policy choice for an attention list, not a statistical optimum.
+**Method.** For every market at every pass, the change in open interest since the pass 55-65 minutes earlier nearest 60 minutes (in asset units, valued at the later mark), divided by the thinner side's resting depth within 2% of mid: the rule's own growth_to_thinner_side_depth. Windows where the change is below the rule's min_growth_usd cannot fire and count as silent. Threshold = the lowest value at which it, and every higher value, yields at most 1 episode per day across the surface (consecutive firing windows in one market are one episode), floored at the definitional 1. The budget is the paging rule's, chosen before the data so that promoting the rule to alert needs evidence, not recalibration.
 
-**Data.** Live public API recording of every listed perp: 2026-10-13T06:24 to 2026-10-13T08:20 UTC, 12 passes.
+**Data.** Live public API recording of every listed perp: 2026-10-14T01:02 to 2026-10-15T01:08 UTC, 145 passes.
 
 | Rule | Threshold | Surface | Applied as | Value |
 |---|---|---|---|---|
-| `open_interest_exceeds_depth` | `max_oi_to_depth` | core_perps | rule_default | 67.27 |
-| `open_interest_exceeds_depth` | `max_oi_to_depth` | hip3_perps | profile_override | 39.35 |
+| `open_interest_growth_exceeds_depth` | `max_growth_to_depth` | core_perps | rule_default | 9.64 |
+| `open_interest_growth_exceeds_depth` | `max_growth_to_depth` | hip3_perps | profile_override | 133.65 |
 
 **Checks against incidents.**
 
-- JELLY, 25 days before the attack (2025-03-01): Tardis free dataset hyperliquid book_snapshot_25 and derivative_ticker, JELLY 2025-03-01; 20 levels spanned a median 0.72% of price, so 2% depth is only bounded; open interest median $1,018,502; ratio upper bound median 33.7, p90 52.4 over 146665 snapshots: would not have fired (even the upper bound is below the threshold); core_perps threshold 67.27
-- POPCAT, 11 days before the attack (2025-11-01): Tardis free dataset hyperliquid book_snapshot_25 and derivative_ticker, POPCAT 2025-11-01; 20 levels spanned a median 0.17% of price, so 2% depth is only bounded; open interest median $3,706,777; ratio upper bound median 68.4, p90 109.0 over 133841 snapshots: inconclusive (the upper bound reaches the threshold; the true ratio is lower); core_perps threshold 67.27
+- JELLY (2025-03-26), POPCAT (2025-11-12) and FARTCOIN (2026-04-09): hourly open interest and 2% depth on the attack days. Hyperliquid's API keeps no open interest history, and Tardis's free days are the first of each month.: not checked: no source for the anchors' hourly open interest was found
+
+**Limitations.**
+
+- One day; whether it was typical is unknown, and with a budget of one episode the threshold is that day's largest episode.
+- The materiality threshold (min_growth_usd) is a placeholder held fixed; only the depth threshold is calibrated, conditional on it.
+- Open interest change is net of closes, so heavy turnover hides some new positions.
+- Hyperps cannot be told apart from validator-operated perps in the API and are pooled into core_perps.
+
+**core_perps.** markets: 178, windows: 24742, unknown_windows: 0, windows_below_min_growth: 24005, min_growth_usd: 250000.0, days: 0.96, episodes_per_day_budget: 1.0, episodes_allowed: 1, budget_value: 9.64, value: 9.64, episodes_at_value: 1, infinite_ratio_windows: 0
+
+
+Episodes by market: PYTH (1).
+
+**hip3_perps.** markets: 161, windows: 22278, unknown_windows: 0, windows_below_min_growth: 20675, min_growth_usd: 250000.0, days: 0.96, episodes_per_day_budget: 1.0, episodes_allowed: 1, budget_value: 133.65, value: 133.65, episodes_at_value: 1, infinite_ratio_windows: 0
+
+
+Episodes by market: io:PRL (1).
+
+## `open_interest_to_depth_cross_section` (computed 2026-10-15)
+
+**Method.** For every listed market, the median over the recording of the rule's own ratio (open interest / thinner side's resting depth within 2% of mid from l2Book, escalating nSigFigs until 20 levels reach the band edge (rows where no aggregation covered the band are excluded)). Threshold = 90th percentile of those medians across markets of the surface, so the rule marks the most exposed tenth of markets. The percentile is a policy choice for an attention list, not a statistical optimum.
+
+**Data.** Live public API recording of every listed perp: 2026-10-14T01:02 to 2026-10-15T01:08 UTC, 145 passes.
+
+| Rule | Threshold | Surface | Applied as | Value |
+|---|---|---|---|---|
+| `open_interest_exceeds_depth` | `max_oi_to_depth` | core_perps | rule_default | 68.87 |
+| `open_interest_exceeds_depth` | `max_oi_to_depth` | hip3_perps | profile_override | 31.04 |
+
+**Checks against incidents.**
+
+- JELLY, 25 days before the attack (2025-03-01): Tardis free dataset hyperliquid book_snapshot_25 and derivative_ticker, JELLY 2025-03-01; 20 levels spanned a median 0.72% of price, so 2% depth is only bounded; open interest median $1,018,502; ratio upper bound median 33.7, p90 52.4 over 146665 snapshots: would not have fired (even the upper bound is below the threshold); core_perps threshold 68.87
+- POPCAT, 11 days before the attack (2025-11-01): Tardis free dataset hyperliquid book_snapshot_25 and derivative_ticker, POPCAT 2025-11-01; 20 levels spanned a median 0.17% of price, so 2% depth is only bounded; open interest median $3,706,777; ratio upper bound median 68.4, p90 109.0 over 133841 snapshots: would not have fired (even the upper bound is below the threshold); core_perps threshold 68.87
 
 **Limitations.**
 
@@ -117,18 +150,18 @@ At or above threshold: xyz:UMC (38216.66), xyz:OURA (14444.56), xyz:BIRD (10783.
 - Hyperps cannot be told apart from validator-operated perps in the API and are pooled into core_perps.
 - Archived order books (Hyperliquid S3, Tardis) store 20 levels at full precision; on 2025-11-01 BTC's 20 levels never reached the 2% band (0 of 157,225 snapshots), so historical depth cannot be measured this way for liquid markets.
 
-**core_perps.** markets: 178, rows_attempted: 2136, rows_measured: 2136, percentile: 0.9, value: 67.27
+**core_perps.** markets: 178, rows_attempted: 25810, rows_measured: 25804, percentile: 0.9, value: 68.87
 
 | p10 | p25 | p50 | p75 | p90 | p95 | p99 |
 |---|---|---|---|---|---|---|
-| 6.11 | 10.09 | 18.47 | 33.37 | 67.27 | 105.01 | 172.24 |
+| 5.82 | 9.94 | 17.38 | 31.24 | 68.87 | 102.76 | 193.31 |
 
-At or above threshold: PURR (740.48), LIT (181.65), GRASS (169.43), HYPE (144.31), ZRO (143.08), CASHCAT (124.5), LINEA (122.18), MON (116.19), MEGA (109.12), SYRUP (104.28), AERO (104.12), APEX (92.27), VVV (91.65), NEAR (85.48), GOAT (74.67), USELESS (71.1), SAGA (70.55), STBL (68.95).
+At or above threshold: PURR (738.88), CASHCAT (198.47), LIT (191.77), HYPE (157.23), LINEA (153.9), GRASS (145.04), ZRO (108.46), MON (108.2), VVV (103.95), MEGA (102.55), APEX (88.05), AERO (80.75), NEAR (76.16), GOAT (74.29), SAGA (73.7), PONS (71.37), SYRUP (70.08), RESOLV (68.98).
 
-**hip3_perps.** markets: 159, rows_attempted: 1908, rows_measured: 1908, percentile: 0.9, value: 39.35
+**hip3_perps.** markets: 161, rows_attempted: 23244, rows_measured: 23239, percentile: 0.9, value: 31.04
 
 | p10 | p25 | p50 | p75 | p90 | p95 | p99 |
 |---|---|---|---|---|---|---|
-| 1.71 | 3.97 | 8.65 | 18.19 | 39.35 | 64.54 | 324.95 |
+| 1.36 | 3.08 | 7.6 | 16.86 | 31.04 | 51.65 | 197.13 |
 
-At or above threshold: para:ANSEM (464.06), xyz:OURA (458.57), xyz:PURRDAT (228.19), xyz:UMC (140.48), io:ANTH (133.52), xyz:GME (95.6), para:TREAD (77.18), xyz:CXMT (76.86), xyz:UNITREE (63.17), xyz:BOT (60.75), xyz:SKHX (53.1), xyz:CRCL (46.18), xyz:GOOGL (44.16), xyz:ZHIPU (43.54), xyz:BIRD (42.64), xyz:STRC (40.45).
+At or above threshold: para:ANSEM (372.04), xyz:OURA (268.29), xyz:PURRDAT (149.69), io:ANTH (137.53), para:TREAD (105.43), xyz:CXMT (71.72), xyz:ZHIPU (66.51), xyz:GME (53.45), xyz:SKHX (51.65), xyz:UNITREE (49.47), xyz:BOT (43.58), io:OAI (41.74), xyz:CRCL (41.54), para:2Y (40.79), xyz:SKHY (38.76), xyz:GOOGL (33.42), para:UNITREE (31.04).

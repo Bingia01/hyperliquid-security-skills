@@ -1,0 +1,76 @@
+id: open_interest_growth_alert_budget
+computed: '2026-10-15'
+method: 'For every market at every pass, the change in open interest since the pass 55-65 minutes earlier
+  nearest 60 minutes (in asset units, valued at the later mark), divided by the thinner side''s resting
+  depth within 2% of mid: the rule''s own growth_to_thinner_side_depth. Windows where the change is below
+  the rule''s min_growth_usd cannot fire and count as silent. Threshold = the lowest value at which it,
+  and every higher value, yields at most 1 episode per day across the surface (consecutive firing windows
+  in one market are one episode), floored at the definitional 1. The budget is the paging rule''s, chosen
+  before the data so that promoting the rule to alert needs evidence, not recalibration.'
+data: 'Live public API recording of every listed perp: 2026-10-14T01:02 to 2026-10-15T01:08 UTC, 145 passes.'
+limitations:
+- One day; whether it was typical is unknown, and with a budget of one episode the threshold is that day's
+  largest episode.
+- The materiality threshold (min_growth_usd) is a placeholder held fixed; only the depth threshold is
+  calibrated, conditional on it.
+- Open interest change is net of closes, so heavy turnover hides some new positions.
+- Hyperps cannot be told apart from validator-operated perps in the API and are pooled into core_perps.
+targets:
+- rule: open_interest_growth_exceeds_depth
+  threshold: max_growth_to_depth
+  surface: core_perps
+  applies_as: rule_default
+  value: 9.64
+- rule: open_interest_growth_exceeds_depth
+  threshold: max_growth_to_depth
+  surface: hip3_perps
+  applies_as: profile_override
+  value: 133.65
+checks:
+- description: 'JELLY (2025-03-26), POPCAT (2025-11-12) and FARTCOIN (2026-04-09): hourly open interest
+    and 2% depth on the attack days. Hyperliquid''s API keeps no open interest history, and Tardis''s
+    free days are the first of each month.'
+  outcome: 'not checked: no source for the anchors'' hourly open interest was found'
+results:
+  core_perps:
+    markets: 178
+    windows: 24742
+    unknown_windows: 0
+    windows_below_min_growth: 24005
+    min_growth_usd: 250000.0
+    days: 0.96
+    episodes_per_day_budget: 1.0
+    episodes_allowed: 1
+    budget_value: 9.64
+    value: 9.64
+    episodes_at_value: 1
+    sized_window_quantiles:
+      p50: 0.258
+      p90: 1.569
+      p99: 6.664
+      max: 9.643
+    infinite_ratio_windows: 0
+    episodes_by_market:
+    - market: PYTH
+      episodes: 1
+  hip3_perps:
+    markets: 161
+    windows: 22278
+    unknown_windows: 0
+    windows_below_min_growth: 20675
+    min_growth_usd: 250000.0
+    days: 0.96
+    episodes_per_day_budget: 1.0
+    episodes_allowed: 1
+    budget_value: 133.65
+    value: 133.65
+    episodes_at_value: 1
+    sized_window_quantiles:
+      p50: 0.231
+      p90: 1.338
+      p99: 8.789
+      max: 133.655
+    infinite_ratio_windows: 0
+    episodes_by_market:
+    - market: io:PRL
+      episodes: 1
