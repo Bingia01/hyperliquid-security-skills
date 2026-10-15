@@ -205,3 +205,33 @@ def test_hip3_backstop_address() -> None:
 def test_client_requires_https() -> None:
     with pytest.raises(ValueError):
         InfoClient(base_url="http://api.hyperliquid.xyz/info")
+
+
+def test_client_retries_a_dropped_connection(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A server closing the connection without a response is transient (it ended a
+    recording session on 2026-10-13), so it is retried like a 5xx."""
+    import http.client
+    import io
+
+    calls: list[int] = []
+
+    def urlopen(request: Any, timeout: float) -> io.BytesIO:
+        calls.append(1)
+        if len(calls) == 1:
+            raise http.client.RemoteDisconnected("Remote end closed connection without response")
+        return io.BytesIO(b'{"ok": true}')
+
+    monkeypatch.setattr("hyperliquid_security.hyperliquid_api.urllib.request.urlopen", urlopen)
+    monkeypatch.setattr("hyperliquid_security.hyperliquid_api.time.sleep", lambda _: None)
+    assert InfoClient().post({"type": "allMids"}) == {"ok": True}
+    assert len(calls) == 2
+
+
+def test_client_gives_up_with_api_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def urlopen(request: Any, timeout: float) -> Any:
+        raise ConnectionResetError("reset by peer")
+
+    monkeypatch.setattr("hyperliquid_security.hyperliquid_api.urllib.request.urlopen", urlopen)
+    monkeypatch.setattr("hyperliquid_security.hyperliquid_api.time.sleep", lambda _: None)
+    with pytest.raises(ApiError, match="reset by peer"):
+        InfoClient(retries=2).post({"type": "allMids"})

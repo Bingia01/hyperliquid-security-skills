@@ -48,8 +48,8 @@ jobs:
           hours, interval = float(os.environ["HOURS"]), float(os.environ["INTERVAL"])
           if not 0 < hours <= 30 or interval < 60:
               raise SystemExit("hours must be in (0, 30] and interval_seconds at least 60")
-          # Each segment records for up to 5.4 hours; one spare covers start-up delays.
-          segments = math.ceil(hours / 5.4) + 1
+          # Each segment records for up to 5.3 hours; one spare covers start-up delays.
+          segments = math.ceil(hours / 5.3) + 1
           print("segments=" + json.dumps(list(range(1, segments + 1))))
           EOF
 
@@ -71,14 +71,14 @@ jobs:
         run: pip install -e .
       - name: Fetch the session so far
         uses: actions/download-artifact@v4
+        # Segment 1 has nothing to fetch; a later segment that fetched nothing is
+        # stopped by the manifest check in the next step.
+        continue-on-error: true
         with:
           pattern: session-*
           path: session
           merge-multiple: true
-      - name: Record, resuming the session
-        env:
-          HOURS: ${{ inputs.hours }}
-          INTERVAL: ${{ inputs.interval_seconds }}
+      - name: Prepare
         run: |
           mkdir -p session new
           if [ "${{ matrix.segment }}" != 1 ] && [ ! -f session/manifest.json ]; then
@@ -86,17 +86,30 @@ jobs:
             exit 1
           fi
           ls session > before.txt
+      - name: Record, resuming the session
+        # Ends before the job's limit so the next two steps can save what was recorded.
+        timeout-minutes: 335
+        env:
+          HOURS: ${{ inputs.hours }}
+          INTERVAL: ${{ inputs.interval_seconds }}
+        run: |
           status=0
           hyperliquid-security record --out-dir session --hours "$HOURS" \
-            --interval-seconds "$INTERVAL" --stop-after-hours 5.4 || status=$?
+            --interval-seconds "$INTERVAL" --stop-after-hours 5.3 || status=$?
           # 0: session complete; 3: stopped early and resumes in the next segment.
           if [ "$status" != 0 ] && [ "$status" != 3 ]; then exit "$status"; fi
-          for path in session/*; do
+      - name: Keep this segment's passes, even if recording failed
+        if: always()
+        run: |
+          [ -f before.txt ] || exit 0
+          for path in session/manifest.json session/pass-*.jsonl.gz; do
+            [ -e "$path" ] || continue
             name=$(basename "$path")
             grep -qxF "$name" before.txt || cp "$path" new/
           done
           echo "$(ls new | wc -l) new files in segment ${{ matrix.segment }}"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: session-${{ matrix.segment }}
           path: new/

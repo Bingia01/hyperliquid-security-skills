@@ -1,11 +1,11 @@
 id: open_interest_to_depth_cross_section
-computed: '2026-10-13'
+computed: '2026-10-15'
 method: For every listed market, the median over the recording of the rule's own ratio (open interest
   / thinner side's resting depth within 2% of mid from l2Book, escalating nSigFigs until 20 levels reach
   the band edge (rows where no aggregation covered the band are excluded)). Threshold = 90th percentile
   of those medians across markets of the surface, so the rule marks the most exposed tenth of markets.
   The percentile is a policy choice for an attention list, not a statistical optimum.
-data: 'Live public API recording of every listed perp: 2026-10-13T06:24 to 2026-10-13T08:20 UTC, 12 passes.'
+data: 'Live public API recording of every listed perp: 2026-10-14T01:02 to 2026-10-15T01:08 UTC, 145 passes.'
 limitations:
 - One recording window in one market regime; stress regimes are absent.
 - Hyperps cannot be told apart from validator-operated perps in the API and are pooled into core_perps.
@@ -17,122 +17,123 @@ targets:
   threshold: max_oi_to_depth
   surface: core_perps
   applies_as: rule_default
-  value: 67.27
+  value: 68.87
 - rule: open_interest_exceeds_depth
   threshold: max_oi_to_depth
   surface: hip3_perps
   applies_as: profile_override
-  value: 39.35
+  value: 31.04
 checks:
 - description: 'JELLY, 25 days before the attack (2025-03-01): Tardis free dataset hyperliquid book_snapshot_25
     and derivative_ticker, JELLY 2025-03-01; 20 levels spanned a median 0.72% of price, so 2% depth is
     only bounded; open interest median $1,018,502; ratio upper bound median 33.7, p90 52.4 over 146665
     snapshots'
-  outcome: would not have fired (even the upper bound is below the threshold); core_perps threshold 67.27
+  outcome: would not have fired (even the upper bound is below the threshold); core_perps threshold 68.87
 - description: 'POPCAT, 11 days before the attack (2025-11-01): Tardis free dataset hyperliquid book_snapshot_25
     and derivative_ticker, POPCAT 2025-11-01; 20 levels spanned a median 0.17% of price, so 2% depth is
     only bounded; open interest median $3,706,777; ratio upper bound median 68.4, p90 109.0 over 133841
     snapshots'
-  outcome: inconclusive (the upper bound reaches the threshold; the true ratio is lower); core_perps threshold
-    67.27
+  outcome: would not have fired (even the upper bound is below the threshold); core_perps threshold 68.87
 results:
   core_perps:
     surface: core_perps
     markets: 178
-    rows_attempted: 2136
-    rows_measured: 2136
+    rows_attempted: 25810
+    rows_measured: 25804
     percentile: 0.9
-    value: 67.27
+    value: 68.87
     quantiles:
-      p10: 6.11
-      p25: 10.09
-      p50: 18.47
-      p75: 33.37
-      p90: 67.27
-      p95: 105.01
-      p99: 172.24
+      p10: 5.82
+      p25: 9.94
+      p50: 17.38
+      p75: 31.24
+      p90: 68.87
+      p95: 102.76
+      p99: 193.31
     above_threshold:
     - market: PURR
-      median: 740.48
-    - market: LIT
-      median: 181.65
-    - market: GRASS
-      median: 169.43
-    - market: HYPE
-      median: 144.31
-    - market: ZRO
-      median: 143.08
+      median: 738.88
     - market: CASHCAT
-      median: 124.5
+      median: 198.47
+    - market: LIT
+      median: 191.77
+    - market: HYPE
+      median: 157.23
     - market: LINEA
-      median: 122.18
+      median: 153.9
+    - market: GRASS
+      median: 145.04
+    - market: ZRO
+      median: 108.46
     - market: MON
-      median: 116.19
-    - market: MEGA
-      median: 109.12
-    - market: SYRUP
-      median: 104.28
-    - market: AERO
-      median: 104.12
-    - market: APEX
-      median: 92.27
+      median: 108.2
     - market: VVV
-      median: 91.65
+      median: 103.95
+    - market: MEGA
+      median: 102.55
+    - market: APEX
+      median: 88.05
+    - market: AERO
+      median: 80.75
     - market: NEAR
-      median: 85.48
+      median: 76.16
     - market: GOAT
-      median: 74.67
-    - market: USELESS
-      median: 71.1
+      median: 74.29
     - market: SAGA
-      median: 70.55
-    - market: STBL
-      median: 68.95
+      median: 73.7
+    - market: PONS
+      median: 71.37
+    - market: SYRUP
+      median: 70.08
+    - market: RESOLV
+      median: 68.98
   hip3_perps:
     surface: hip3_perps
-    markets: 159
-    rows_attempted: 1908
-    rows_measured: 1908
+    markets: 161
+    rows_attempted: 23244
+    rows_measured: 23239
     percentile: 0.9
-    value: 39.35
+    value: 31.04
     quantiles:
-      p10: 1.71
-      p25: 3.97
-      p50: 8.65
-      p75: 18.19
-      p90: 39.35
-      p95: 64.54
-      p99: 324.95
+      p10: 1.36
+      p25: 3.08
+      p50: 7.6
+      p75: 16.86
+      p90: 31.04
+      p95: 51.65
+      p99: 197.13
     above_threshold:
     - market: para:ANSEM
-      median: 464.06
+      median: 372.04
     - market: xyz:OURA
-      median: 458.57
+      median: 268.29
     - market: xyz:PURRDAT
-      median: 228.19
-    - market: xyz:UMC
-      median: 140.48
+      median: 149.69
     - market: io:ANTH
-      median: 133.52
-    - market: xyz:GME
-      median: 95.6
+      median: 137.53
     - market: para:TREAD
-      median: 77.18
+      median: 105.43
     - market: xyz:CXMT
-      median: 76.86
-    - market: xyz:UNITREE
-      median: 63.17
-    - market: xyz:BOT
-      median: 60.75
-    - market: xyz:SKHX
-      median: 53.1
-    - market: xyz:CRCL
-      median: 46.18
-    - market: xyz:GOOGL
-      median: 44.16
+      median: 71.72
     - market: xyz:ZHIPU
-      median: 43.54
-    - market: xyz:BIRD
-      median: 42.64
-    - market: xyz:STRC
-      median: 40.45
+      median: 66.51
+    - market: xyz:GME
+      median: 53.45
+    - market: xyz:SKHX
+      median: 51.65
+    - market: xyz:UNITREE
+      median: 49.47
+    - market: xyz:BOT
+      median: 43.58
+    - market: io:OAI
+      median: 41.74
+    - market: xyz:CRCL
+      median: 41.54
+    - market: para:2Y
+      median: 40.79
+    - market: xyz:SKHY
+      median: 38.76
+    - market: xyz:GOOGL
+      median: 33.42
+    - market: para:UNITREE
+      median: 31.04

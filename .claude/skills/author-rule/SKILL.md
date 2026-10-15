@@ -92,11 +92,11 @@ session into six-hour jobs and uploads the packed passes and the calibration
 results as the `recording` artifact.
 
 ```bash
-hyperliquid-security record --out-dir recordings/2026-10-13 --hours 24 --interval-seconds 600
-hyperliquid-security pack recordings/2026-10-13 \
-  -o knowledge/calibration/data/passes_2026-10-13.jsonl.gz
+hyperliquid-security record --out-dir recordings/2026-10-14 --hours 24 --interval-seconds 600
+hyperliquid-security pack recordings/2026-10-14 \
+  -o knowledge/calibration/data/passes_2026-10-14.jsonl.gz
 hyperliquid-security record --candles --out candles_5m.json
-hyperliquid-security calibrate --passes knowledge/calibration/data/passes_2026-10-13.jsonl.gz \
+hyperliquid-security calibrate --passes knowledge/calibration/data/passes_2026-10-14.jsonl.gz \
   --candles candles_5m.json --anchors knowledge/calibration/data/anchor_moves.json
 ```
 

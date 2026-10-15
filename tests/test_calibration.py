@@ -209,6 +209,33 @@ def test_recording_session_resumes_and_packs(tmp_path: Path) -> None:
     assert len(list(session.glob("pass-*.jsonl.gz"))) == 6
 
 
+def test_recording_session_survives_a_failed_pass(tmp_path: Path) -> None:
+    from hyperliquid_security.recording import record_session
+
+    calls = {"perpDexs": 0}
+
+    def flaky(payload: dict[str, Any]) -> Any:
+        if payload["type"] == "perpDexs":
+            calls["perpDexs"] += 1
+            if calls["perpDexs"] == 2:
+                raise ApiError("perpDexs failed: Remote end closed connection without response")
+        return fake_market_api(payload)
+
+    clock = FakeClock()
+    client = MeteredClient(InfoClient(transport=flaky), RateLimiter(10_000))
+    messages: list[str] = []
+    complete = record_session(
+        client, tmp_path, 0.5, 600, now=clock.now, sleep=clock.sleep, log=messages.append
+    )
+    assert complete
+    files = sorted(tmp_path.glob("pass-*.jsonl.gz"))
+    assert len(files) == 2  # three attempts, one skipped
+    assert any("skipped" in m for m in messages)
+    from hyperliquid_security.calibration import load_passes
+
+    assert sorted({r["pass"] for r in load_passes(tmp_path)}) == [1, 2]
+
+
 def test_recording_session_refuses_another_api(tmp_path: Path) -> None:
     from hyperliquid_security.recording import record_session
 
@@ -385,14 +412,18 @@ def test_committed_calibrations_reproduce_from_committed_data(repo_kb: Knowledge
     Changing a rule's report expression, or the data, without recalibrating
     fails here. (Archive checks need third-party files and are not re-run.)
     """
-    from hyperliquid_security.calibration import calibrate_cross_sections, load_passes
+    from hyperliquid_security.calibration import (
+        calibrate_cross_sections,
+        calibrate_open_interest_growth,
+        load_passes,
+    )
     from tests.conftest import KNOWLEDGE
 
     data = KNOWLEDGE / "calibration" / "data"
-    computed = dt.date(2026, 10, 13)
-    fresh = calibrate_cross_sections(
-        repo_kb, load_passes(data / "passes_2026-10-13.jsonl.gz"), computed
-    )
+    computed = dt.date(2026, 10, 15)
+    rows = load_passes(data / "passes_2026-10-14.jsonl.gz")
+    fresh = calibrate_cross_sections(repo_kb, rows, computed)
+    fresh.append(calibrate_open_interest_growth(repo_kb, rows, computed))
     fresh.append(calibrate_mark_moves(data / "candles_5m_2026-10-13.json.gz", computed))
     for result in fresh:
         committed = repo_kb.calibrations[result["id"]]
@@ -457,8 +488,18 @@ def test_growth_calibration_spends_the_budget_on_material_growth(repo_kb: Knowle
     core, hip3 = result["results"]["core_perps"], result["results"]["hip3_perps"]
     assert core["episodes_allowed"] == 1
     assert core["value"] == 3.0  # only BIG within a budget of one; DUST never counts
+    assert core["episodes_at_value"] == 1  # the episode that set the threshold still fires
     assert core["windows_below_min_growth"] == 1
     assert [e["market"] for e in core["episodes_by_market"]] == ["BIG"]
     assert hip3["value"] == 1.0  # the budget allows lower; the definitional floor holds
     assert [t["value"] for t in result["targets"]] == [3.0, 1.0]
     CalibrationResult.model_validate(result)
+
+
+def test_growth_threshold_rounds_down_only_within_budget() -> None:
+    from hyperliquid_security.calibration import _round_within_budget
+
+    # 9.643 rounds down to 9.64 and still allows the one episode that set it.
+    assert _round_within_budget({"A": [9.643]}, 9.643, 1) == 9.64
+    # Rounding down would admit B's 9.641 as a second episode, so round up.
+    assert _round_within_budget({"A": [9.643], "B": [9.641]}, 9.643, 1) == 9.65

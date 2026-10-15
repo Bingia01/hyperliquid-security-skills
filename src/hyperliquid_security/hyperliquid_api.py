@@ -20,6 +20,7 @@ Facts this module relies on (checked against the live API on 2026-10-12):
 from __future__ import annotations
 
 import datetime as dt
+import http.client
 import json
 import time
 import urllib.error
@@ -85,7 +86,9 @@ class InfoClient:
                 last_error = exc
                 if exc.code not in (429, 500, 502, 503, 504):
                     break
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            except (OSError, http.client.HTTPException, json.JSONDecodeError) as exc:
+                # Unreachable hosts, timeouts, resets and a server closing the connection
+                # without a response (http.client.RemoteDisconnected) are transient.
                 last_error = exc
             time.sleep(2**attempt)
         raise ApiError(f"{payload.get('type')} failed: {last_error}")

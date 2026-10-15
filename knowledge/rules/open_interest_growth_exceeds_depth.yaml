@@ -25,12 +25,20 @@ protects: [loss_containment]
 anchors: [hl-2025-03-jelly, hl-2025-11-popcat, hl-2026-04-fartcoin]
 thresholds:
   max_growth_to_depth:
-    value: 1.0
+    value: 9.64
     unit: ratio
-    basis: definitional
+    basis: calibrated
+    calibration: open_interest_growth_alert_budget
     note: >-
-      1.0 means the positions opened in the last hour alone could not be closed
-      within 2% even by taking all resting depth on the thinner side.
+      Alert budget of one episode per day per surface on the full-day
+      recording of 2026-10-14, never below 1.0 (where the hour's new positions
+      could no longer be closed within 2%). One event set it: PYTH, 03:13-04:03
+      UTC, about $2.1M of new open interest an hour (+40%) against $220-275k of
+      depth, up to 9.64x. The HIP-3 profile's 133.65 was set by io:PRL, listed
+      that day at 17:57 UTC, whose book held $2.3k when $311k of positions
+      arrived; at that value the rule misses xyz:CRWV ($21-34M an hour against
+      $1.1-1.8M, 13-23x) and xyz:SKHX ($72M against $4.5M, 16x). One day makes
+      the budget's single episode the day's maximum; more days are needed.
   min_growth_usd:
     value: 250.0e3
     unit: usd
@@ -66,8 +74,13 @@ limitations:
   - No anchor's record states how long the build-up preceded the liquidation, so the lead time this rule gives is unmeasured.
   - Needs a snapshot of the same market taken 55 to 65 minutes earlier (`snapshot --previous`); without one the rule returns unknown.
 fixtures:
-  - name: an hour's new positions twice the thinner side fire
+  - name: an hour's new positions twelve times the thinner side fire
     expect: fires
+    provenance: synthetic
+    surface: core_perps
+    values: {market.open_interest_change_usd_1h: 2.4e6, market.bid_depth_usd_2pct: 1.5e6, market.ask_depth_usd_2pct: 0.2e6}
+  - name: twice the thinner side is below the calibrated threshold
+    expect: silent
     provenance: synthetic
     surface: core_perps
     values: {market.open_interest_change_usd_1h: 2.0e6, market.bid_depth_usd_2pct: 1.5e6, market.ask_depth_usd_2pct: 1.0e6}
@@ -86,7 +99,8 @@ fixtures:
     expect: fires
     provenance: synthetic
     surface: hyperps
-    values: {market.open_interest_change_usd_1h: 250.0e3, market.bid_depth_usd_2pct: 250.0e3, market.ask_depth_usd_2pct: 1.0e6}
+    values: {market.open_interest_change_usd_1h: 2.41e6, market.bid_depth_usd_2pct: 250.0e3, market.ask_depth_usd_2pct: 1.0e6}
+    note: 2.41M / 250k is exactly 9.64, the rule's default (hyperps have no profile).
   - name: falling open interest is silent even with depth unmeasured
     expect: silent
     provenance: synthetic

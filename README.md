@@ -17,16 +17,19 @@ markets, HyperEVM applications and user accounts.
 Read [docs/DESIGN.md](docs/DESIGN.md) for the reasoning, assumptions and
 constraints, and for what changed from v1/v2 and why.
 
-## Status at v3.3.0, stated plainly
+## Status at v3.4.0, stated plainly
 
 Live numbers are in the generated reports; these describe the release.
 
 - 14 incidents (derived tiers: 2 confirmed, 8 credible reports, 4 research leads).
   Claim-to-source mappings were verified line by line for JELLY and
   xyz:SKHYNIX; the rest come from a research pass and are marked unchecked.
-- 17 rules. Five threshold values are calibrated on recorded market data to
-  stated targets (see [calibration.md](docs/generated/calibration.md)); five
-  are definitional; the rest are placeholders and say so. Two rules have
+- 17 rules. Seven threshold values are calibrated on recorded market data to
+  stated targets (a full day of passes over every listed perp, and 17 days of
+  candles; see [calibration.md](docs/generated/calibration.md)); four are
+  definitional; the rest are placeholders and say so. The growth rule's HIP-3
+  value (133.65) shows its one-alert-a-day target failing on HIP-3 and awaits
+  a decision. Two rules have
   fixtures reconstructed from real incidents; the rest are validated on
   synthetic fixtures, which test logic only.
 - Exactly one rule (`mark_jump_short_window`) meets the bar for paging a human.

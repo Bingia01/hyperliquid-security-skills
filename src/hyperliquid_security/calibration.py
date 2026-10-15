@@ -594,6 +594,17 @@ def _effective_threshold(kb: KnowledgeBase, rule_id: str, name: str, surface: st
     return kb.rules[rule_id].thresholds[name].value
 
 
+def _round_within_budget(
+    series_by_market: Mapping[str, list[float]], threshold: float, allowed: int
+) -> float:
+    """``threshold`` to two decimals: rounded down when that stays within the budget,
+    so the episode that set the threshold still fires, otherwise rounded up."""
+    down = math.floor(threshold * 100) / 100
+    if episodes_total(series_by_market, down) <= allowed:
+        return down
+    return math.ceil(threshold * 100) / 100
+
+
 def calibrate_open_interest_growth(
     kb: KnowledgeBase,
     rows: list[dict[str, Any]],
@@ -634,8 +645,7 @@ def calibrate_open_interest_growth(
             # Infinite ratios (growth with no depth at all inside the band) alone exceed the
             # budget: no threshold meets it, and choosing one is a decision for a person.
             raise ValueError(f"{surface}: no threshold keeps growth alerts within the budget")
-        # Round up, never down: a lower value could admit episodes beyond the budget.
-        value = math.ceil(max(GROWTH_DEPTH_FLOOR, budget) * 100) / 100
+        value = _round_within_budget(series, max(GROWTH_DEPTH_FLOOR, budget), allowed)
         contributors = sorted(
             ((market, episodes(s, value)) for market, s in series.items()),
             key=lambda kv: (-kv[1], kv[0]),
@@ -684,7 +694,8 @@ def calibrate_open_interest_growth(
         ),
         "data": f"Live public API recording of every listed perp: {window}.",
         "limitations": [
-            "One day in one market regime; news-driven or stressed days are absent.",
+            "One day; whether it was typical is unknown, and with a budget of one episode "
+            "the threshold is that day's largest episode.",
             "The materiality threshold (min_growth_usd) is a placeholder held fixed; only the "
             "depth threshold is calibrated, conditional on it.",
             "Open interest change is net of closes, so heavy turnover hides some new positions.",
