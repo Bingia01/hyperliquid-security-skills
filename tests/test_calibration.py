@@ -484,8 +484,18 @@ def test_growth_calibration_spends_the_budget_on_material_growth(repo_kb: Knowle
     core, hip3 = result["results"]["core_perps"], result["results"]["hip3_perps"]
     assert core["episodes_allowed"] == 1
     assert core["value"] == 3.0  # only BIG within a budget of one; DUST never counts
+    assert core["episodes_at_value"] == 1  # the episode that set the threshold still fires
     assert core["windows_below_min_growth"] == 1
     assert [e["market"] for e in core["episodes_by_market"]] == ["BIG"]
     assert hip3["value"] == 1.0  # the budget allows lower; the definitional floor holds
     assert [t["value"] for t in result["targets"]] == [3.0, 1.0]
     CalibrationResult.model_validate(result)
+
+
+def test_growth_threshold_rounds_down_only_within_budget() -> None:
+    from hyperliquid_security.calibration import _round_within_budget
+
+    # 9.643 rounds down to 9.64 and still allows the one episode that set it.
+    assert _round_within_budget({"A": [9.643]}, 9.643, 1) == 9.64
+    # Rounding down would admit B's 9.641 as a second episode, so round up.
+    assert _round_within_budget({"A": [9.643], "B": [9.641]}, 9.643, 1) == 9.65
